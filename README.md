@@ -45,8 +45,9 @@ In your SBT build add:
 
 - First, try to visualise user interacting with your application in any possible way. 
 - Think about translating pages and forms into a diagram of states and transitions.
+- Notice the required inputs and knowledge accumulated at each user journey stage.
 - Create a new model object and define there the rules of the game, see <https://github.com/hmrc/play-fsm/blob/master/src/test/scala/uk/gov/hmrc/play/fsm/DummyJourneyModel.scala>
-- Create a unit test to validate all possible states and transitions outcomes
+- Create a unit test to validate all possible states and transitions outcomes.
 
 
 
