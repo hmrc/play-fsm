@@ -29,9 +29,9 @@ Common requirements are:
 Finite State Machine is an established pattern to manage complex internal state flow based on a set of transition rules. 
 See <https://brilliant.org/wiki/finite-state-machines/>.
 
-In this library you will ready-to-use solution tailored for use in HMRC-style frontend Play application.
+In this library, you find a ready-to-use solution tailored for use in HMRC-style frontend Play application.
 
-## How tos
+## How-tos
 
 ### How to add play-fsm library to your service?
 
@@ -43,10 +43,10 @@ In your SBT build add:
     
 ### How to start building your FSM journey?
 
-- First try to visualise user interacting with your application any possible way. 
-- Think about translating pages and forms into diagram of states and transitions.
+- First, try to visualise user interacting with your application in any possible way. 
+- Think about translating pages and forms into a diagram of states and transitions.
 - Create a new model object and define there the rules of the game, see <https://github.com/hmrc/play-fsm/blob/master/src/test/scala/uk/gov/hmrc/play/fsm/DummyJourneyModel.scala>
-- Create an unit test to validate all possible states and transitions outcomes
+- Create a unit test to validate all possible states and transitions outcomes
 
 
 
