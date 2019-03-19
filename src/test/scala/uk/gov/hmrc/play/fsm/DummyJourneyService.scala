@@ -28,6 +28,6 @@ class DummyJourneyService extends PersistentJourneyService {
   def get(implicit headerCarrier: HeaderCarrier, timeout: Duration, ec: ExecutionContext): Option[StateAndBreadcrumbs] =
     Await.result(fetch, timeout)
 
-  def clear: Unit = storage.clear
+  def clear(): Unit = storage.clear
 
 }

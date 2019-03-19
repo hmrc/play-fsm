@@ -60,6 +60,7 @@ trait PersistentJourneyService extends JourneyService {
         if (transition.apply.isDefinedAt(state)) transition.apply(state) flatMap { endState =>
           save((endState, if (endState == state) breadcrumbs else state :: breadcrumbs.take(9)))
         } else
+          // throw an exception to give outer layer a chance to stay in sync (e.g. redirect back to the current state)
           model.fail(model.TransitionNotAllowed(state, breadcrumbs, transition))
       }
     } yield endStateOrError

@@ -15,6 +15,8 @@ object DummyJourneyModel extends JourneyModel {
   object Transitions {
     import State._
 
+    val start = DummyJourneyModel.start
+
     def continue(user: Int)(arg: String) = Transition {
       case Start          => goto(Continue(arg))
       case Continue(curr) => goto(Continue(curr + "," + arg))

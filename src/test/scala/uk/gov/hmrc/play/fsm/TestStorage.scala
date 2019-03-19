@@ -30,6 +30,6 @@ trait TestStorage[S] {
     state = Some(newState); newState
   }
 
-  def clear: Unit =
+  def clear(): Unit =
     state = None
 }
