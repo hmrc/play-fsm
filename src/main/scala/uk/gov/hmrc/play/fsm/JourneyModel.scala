@@ -19,7 +19,7 @@ package uk.gov.hmrc.play.fsm
 import scala.concurrent.Future
 
 /**
-  * JourneyModel is an abstract base of process logic definition in terms of Finite State Machine pattern.
+  * JourneyModel is an abstract base of a process diagram definition in terms of Finite State Machine pattern.
   *
   * @see https://brilliant.org/wiki/finite-state-machines/
   */

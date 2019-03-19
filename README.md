@@ -41,16 +41,39 @@ In your SBT build add:
     
     libraryDependencies += "uk.gov.hmrc" %% "play-fsm" % "0.2.0-play-25"
     
-### How to start building your FSM journey?
-
+### How to build a process model?
 - First, try to visualise user interacting with your application in any possible way. 
 - Think about translating pages and forms into a diagram of states and transitions.
 - Notice the required inputs and knowledge accumulated at each user journey stage.
 - Create a new model object and define there the rules of the game, see an example in <https://github.com/hmrc/play-fsm/blob/master/src/test/scala/uk/gov/hmrc/play/fsm/DummyJourneyModel.scala>.
 - Create a unit test to validate all possible states and transitions outcomes, see an example in <https://github.com/hmrc/play-fsm/blob/master/src/test/scala/uk/gov/hmrc/play/fsm/DummyJourneyModelSpec.scala>.
 
+### How to persist in the state?
+- play-fsm is not opinionated about state persistence choice but provides an abstract API in the `PersistentJourneyService`.
+- `JsonStateFormats` helper is provided to quickly encode/decode JSON when storing state in a MongoDB or in an external service, e.g. <https://github.com/hmrc/play-fsm/blob/master/src/test/scala/uk/gov/hmrc/play/fsm/DummyJourneyStateFormats.scala>.
+
+### How to define a controller?
+- Create a controller as usual extending `JourneyController` trait.
+- Implement 2 required abstract methods:
+- - `getCallFor(state: State): Call` to translate state into matching GET endpoint url
+- - `renderState(state: State, breadcrumbs: List[State], formWithErrors: Option[Form[_]]): Request[_] => Result` to produce representation of a state, i.e. an HTML page
+- Define actions using provided builder selection, see <https://github.com/hmrc/play-fsm/blob/master/src/test/scala/uk/gov/hmrc/play/fsm/DummyJourneyController.scala>.
 
 ## Advanced examples:
 - Agent Invitations: <https://github.com/hmrc/agent-invitations-frontend/tree/master/app/uk/gov/hmrc/agentinvitationsfrontend/journeys>
-- Agent-Client relationships management helpdesk: <TBC>
+- Agent-Client relationships management help-desk: <TBC>
+
+## Best practices
+- Keep a single model definition in a single file.
+- Name states as nouns and transitions as verbs.
+- Carefully balance when to introduce new state and when to add properties to the existing one(s).
+- Use a rule of thumb to keep only relevant information in the state.
+- Try to avoid optional properties; their presence usually suggest splitting the state.
+- Do NOT inject functions in a state; a state should be immutable and serializable.
+- Define transitions using curried methods. It works well with action builders.
+- When the transition depends on some external operation(s), pass it as a function(s).
+- GET actions should be idempotent, i.e. should only render existing or historical state.
+- POST actions should always invoke some state transition and be followed be redirect.
+- Generate backlinks using provided `getCallFor` and breadcrumbs head if any.
+
 
