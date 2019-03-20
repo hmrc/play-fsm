@@ -1,5 +1,5 @@
 # play-fsm
-This library provides Finite State Machine building blocks for a stateful Play application.
+This library provides State Machine building blocks for a stateful Play application.
 
 ## Features
 - `JourneyModel` state and transition model
@@ -22,14 +22,17 @@ Common requirements are:
 - the testability of an application must not be compromised by implementation complexity
 
 ## Solution
-Finite State Machine is an established pattern to manage complex internal state flow based on a set of transition rules. 
+State Machine is an established pattern to manage complex internal state flow based on a set of transition rules. 
 See <https://brilliant.org/wiki/finite-state-machines/>.
 
-In this library, you find a ready-to-use solution tailored for use in HMRC-style frontend Play application. 
+In this library, you find a ready-to-use solution tailored for use in an HMRC-style frontend Play application, like `agent-invitations-frontend`. 
 
 ## Design
-The key concept in the library is a *Journey*. Each journey represents separate business transaction. It is only loosely related to the HTTP and user session, in fact, depending on the state persistence
-implementation it can be a part of a user session or even it could span multiple users. Former is the common variant. It is expected of an application to have one or more journeys. 
+The key concept is a *Journey*. 
+Each journey represents separate business transaction. 
+It is only loosely related to the HTTP and user session, in fact, depending on the state persistence
+implementation it can be a part of a user session or even it could span multiple users. 
+Former is the common variant. It is expected of an application to have one or more journeys. 
 
 Journey consist of a set of *State*s and *Transition*s. 
 
@@ -42,9 +45,9 @@ External async requests to the upstream services should be provided as a functio
 
 ## Benefits
 - proper concern separation: 
--- *model* defines core business transaction logic decoupled from the application implementation intricacies,
--- *controller* is responsible for wiring user interactions (HTTP requests and responses, HTML forms and pages) into the model,
--- *service* acts as glue between controller and model, providing persistence and session management.
+    - *model* defines core business transaction logic decoupled from the application implementation intricacies,
+    - *controller* is responsible for wiring user interactions (HTTP requests and responses, HTML forms and pages) into the model,
+    - *service* acts as glue between controller and model, providing persistence and session management.
 - lightweight, complete and fast testing of a core journey model without spanning a Play application or an HTTP server.
 
 ## How-tos
@@ -71,8 +74,8 @@ In your SBT build add:
 ### How to define a controller?
 - Create a controller as usual extending `JourneyController` trait.
 - Implement required abstract methods:
-- - `getCallFor(state: State): Call` to translate state into matching GET endpoint url
-- - `renderState(state: State, breadcrumbs: List[State], formWithErrors: Option[Form[_]]): Request[_] => Result` to produce representation of a state, i.e. an HTML page
+    - `getCallFor(state: State): Call` to translate state into matching GET endpoint url
+    - `renderState(state: State, breadcrumbs: List[State], formWithErrors: Option[Form[_]]): Request[_] => Result` to produce representation of a state, i.e. an HTML page
 - Define actions using provided builder selection, see <https://github.com/hmrc/play-fsm/blob/master/src/test/scala/uk/gov/hmrc/play/fsm/DummyJourneyController.scala>.
 
 ## Advanced examples:
@@ -83,13 +86,73 @@ In your SBT build add:
 - Keep a single model definition in a single file.
 - Name states as nouns and transitions as verbs.
 - Carefully balance when to introduce new state and when to add properties to the existing one(s).
-- Use a rule of thumb to keep only relevant information in the state.
+- Use a rule of thumb to keep only relevant data in the state.
 - Try to avoid optional properties; their presence usually suggest splitting the state.
-- Do NOT inject functions in a state; a state should be immutable and serializable.
+- Do NOT put functions and framework components in a state; a state should be immutable and serializable.
 - Define transitions using curried methods. It works well with action builders.
 - When the transition depends on some external operation(s), pass it as a function(s).
 - GET actions should be idempotent, i.e. should only render existing or historical state.
 - POST actions should always invoke some state transition and be followed be a redirect.
 - Generate backlink using provided `getCallFor` and breadcrumbs head state if any.
 
+## Common patterns
+
+### State
+
+- finite: sealed trait and a set of case classes/objects
+
+```
+    sealed trait State
+    
+    object State {
+        case object Start extends State
+        case class Continue(arg: String) extends State
+        case class Stop(result: String) extends State
+    }
+```
+
+- continuous: class or trait or a primitive value wrapper
+
+```
+    type State = String
+```
+
+### Transition
+
+- simple transition depending only on a current state
+
+```
+val start = Transition {
+    case State.Start        => goto(State.Start)
+    case State.Continue(_)  => goto(State.Start)
+    case State.Stop(_)      => goto(State.Stop)
+}
+```
+
+- transition depending on a state and single parameter
+
+```
+def stop(user: User) = Transition {
+    case Start              => goto(Stop(""))
+    case Continue(value)    => goto(Stop(value))
+}
+```
+
+- transition depending on a state and multiple parameters
+
+```
+def continue(user: User)(input: String) = Transition {
+    case Start              => goto(Continue(arg))
+    case Continue(value)    => goto(Continue(value + "," + input))
+}
+```
+
+- transition depending on a state, parameter and an async data source
+
+```
+def continue(user: User)(externalCall: Int => Future[String]) = Transition {
+    case Start              => externalCall.map(input => goto(Continue(input)))
+    case Continue(value)    => externalCall.map(input => goto(Continue(value + "," + input)))
+}
+```
 

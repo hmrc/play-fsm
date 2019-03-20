@@ -37,7 +37,7 @@ trait JourneyModel {
   val root: State
 
   /** Built-in transition from anywhere to the root state */
-  protected[fsm] final def start: Transition = Transition {
+  protected[fsm] final val start = Transition {
     case _ => goto(root)
   }
 
