@@ -1,9 +1,7 @@
 # play-fsm
-
 This library provides Finite State Machine building blocks for a stateful Play application.
 
 ## Features
-
 - `JourneyModel` state and transition model
 - `JourneyService` basic state and breadcrumbs services
 - `PersistentJourneyService` persistence plug-in
@@ -11,7 +9,6 @@ This library provides Finite State Machine building blocks for a stateful Play a
 - `JsonStateFormats` state to json serialization and deserialization builder
     
 ## Motivation
-
 Managing adequately complex stateful behaviour in an application is a challenge. 
 It is even more of a challenge in a traditional server-oriented web application built on top of a stateless-by-design HTTP protocol.
 
@@ -25,11 +22,30 @@ Common requirements are:
 - the testability of an application must not be compromised by implementation complexity
 
 ## Solution
-
 Finite State Machine is an established pattern to manage complex internal state flow based on a set of transition rules. 
 See <https://brilliant.org/wiki/finite-state-machines/>.
 
-In this library, you find a ready-to-use solution tailored for use in HMRC-style frontend Play application.
+In this library, you find a ready-to-use solution tailored for use in HMRC-style frontend Play application. 
+
+## Design
+The key concept in the library is a *Journey*. Each journey represents separate business transaction. It is only loosely related to the HTTP and user session, in fact, depending on the state persistence
+implementation it can be a part of a user session or even it could span multiple users. Former is the common variant. It is expected of an application to have one or more journeys. 
+
+Journey consist of a set of *State*s and *Transition*s. 
+
+*State* can be anything but usually it will be a set of case classes/objects representing the stage and data of a business transaction. 
+State is not expected to have finite values, can be continuous if needed!
+
+*Transition* is a means of moving from one state to another. It is represented as a partial async function. 
+Transition should be a *pure* function, depending only on its own parameters and state. 
+External async requests to the upstream services should be provided as a function-type parameters. 
+
+## Benefits
+- proper concern separation: 
+-- *model* defines core business transaction logic decoupled from the application implementation intricacies,
+-- *controller* is responsible for wiring user interactions (HTTP requests and responses, HTML forms and pages) into the model,
+-- *service* acts as glue between controller and model, providing persistence and session management.
+- lightweight, complete and fast testing of a core journey model without spanning a Play application or an HTTP server.
 
 ## How-tos
 
@@ -41,7 +57,7 @@ In your SBT build add:
     
     libraryDependencies += "uk.gov.hmrc" %% "play-fsm" % "0.9.0-play-25"
     
-### How to build a process model?
+### How to build a model?
 - First, try to visualise user interacting with your application in any possible way. 
 - Think about translating pages and forms into a diagram of states and transitions.
 - Notice the required inputs and knowledge accumulated at each user journey stage.
@@ -49,12 +65,12 @@ In your SBT build add:
 - Create a unit test to validate all possible states and transitions outcomes, see an example in <https://github.com/hmrc/play-fsm/blob/master/src/test/scala/uk/gov/hmrc/play/fsm/DummyJourneyModelSpec.scala>.
 
 ### How to persist in the state?
-- play-fsm is not opinionated about state persistence choice but provides an abstract API in the `PersistentJourneyService`.
-- `JsonStateFormats` helper is provided to quickly encode/decode JSON when storing state in a MongoDB or in an external service, e.g. <https://github.com/hmrc/play-fsm/blob/master/src/test/scala/uk/gov/hmrc/play/fsm/DummyJourneyStateFormats.scala>.
+- play-fsm is not opinionated about state persistence and session management choice but provides an abstract API in the `PersistentJourneyService`.
+- `JsonStateFormats` helps to encode/decode state to JSON when using MongoDB or an external REST service, e.g. <https://github.com/hmrc/play-fsm/blob/master/src/test/scala/uk/gov/hmrc/play/fsm/DummyJourneyStateFormats.scala>.
 
 ### How to define a controller?
 - Create a controller as usual extending `JourneyController` trait.
-- Implement 2 required abstract methods:
+- Implement required abstract methods:
 - - `getCallFor(state: State): Call` to translate state into matching GET endpoint url
 - - `renderState(state: State, breadcrumbs: List[State], formWithErrors: Option[Form[_]]): Request[_] => Result` to produce representation of a state, i.e. an HTML page
 - Define actions using provided builder selection, see <https://github.com/hmrc/play-fsm/blob/master/src/test/scala/uk/gov/hmrc/play/fsm/DummyJourneyController.scala>.
@@ -73,7 +89,7 @@ In your SBT build add:
 - Define transitions using curried methods. It works well with action builders.
 - When the transition depends on some external operation(s), pass it as a function(s).
 - GET actions should be idempotent, i.e. should only render existing or historical state.
-- POST actions should always invoke some state transition and be followed be redirect.
-- Generate backlinks using provided `getCallFor` and breadcrumbs head if any.
+- POST actions should always invoke some state transition and be followed be a redirect.
+- Generate backlink using provided `getCallFor` and breadcrumbs head state if any.
 
 
