@@ -52,14 +52,14 @@ class DummyJourneyController @Inject()(override val journeyService: DummyJourney
   // VIEWS
 
   /** implement this to map states into endpoints for redirection and back linking */
-  override def getCallFor(state: journeyService.model.State): Call = state match {
+  override def getCallFor(state: journeyService.model.State)(implicit request: Request[_]): Call = state match {
     case State.Start       => Call("GET", "/start")
     case State.Continue(_) => Call("GET", "/continue")
     case State.Stop(_)     => Call("GET", "/stop")
   }
 
-  private def backLinkFor(breadcrumbs: List[State]): String =
-    breadcrumbs.headOption.map(getCallFor).getOrElse(Call("GET", "/")).url
+  private def backLinkFor(breadcrumbs: List[State])(implicit request: Request[_]): String =
+    breadcrumbs.headOption.map(b => getCallFor(b)(request)).getOrElse(Call("GET", "/")).url
 
   /** implement this to render state after transition or when form validation fails */
   override def renderState(

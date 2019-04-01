@@ -51,7 +51,7 @@ trait JourneyController {
   type Route = Request[_] => Result
 
   /** implement this to map states into endpoints for redirection and back linking */
-  def getCallFor(state: State): Call
+  def getCallFor(state: State)(implicit request: Request[_]): Call
 
   /** implement this to render state after transition or when form validation fails */
   def renderState(state: State, breadcrumbs: List[State], formWithErrors: Option[Form[_]]): Route
@@ -64,7 +64,7 @@ trait JourneyController {
 
   /** redirects to the endpoint matching state */
   final val redirect: RouteFactory =
-    (state: StateAndBreadcrumbs) => (_: Request[_]) => Redirect(getCallFor(state._1))
+    (state: StateAndBreadcrumbs) => (request: Request[_]) => Redirect(getCallFor(state._1)(request))
 
   /** applies transition to the current state */
   def apply(
