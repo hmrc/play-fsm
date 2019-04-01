@@ -77,14 +77,21 @@ or
 
 ### How to define a controller?
 - Create a controller as usual extending `JourneyController` trait.
-- Implement required abstract methods:
-    - `getCallFor(state: State): Call` to translate state into matching GET endpoint url
-    - `renderState(state: State, breadcrumbs: List[State], formWithErrors: Option[Form[_]]): Request[_] => Result` to produce representation of a state, i.e. an HTML page
-- Define actions using provided builder selection, see <https://github.com/hmrc/play-fsm/blob/master/src/test/scala/uk/gov/hmrc/play/fsm/DummyJourneyController.scala>.
+- Decide 3 things:
+    - How to wire action calls into model transitions, use provided action helpers selection, see <https://github.com/hmrc/play-fsm/blob/master/src/test/scala/uk/gov/hmrc/play/fsm/DummyJourneyController.scala>.
+    - How to display the state after GET call, implement `renderState`
+- Map all GET calls to states, implement `getCallFor` method
+- Use `backlinkFor` method to get back link call given breadcrumbs
+- GET actions should be idempotent, i.e. should only render existing or historical state.
+- POST actions should always invoke some state transition and be followed be a redirect.
 
 ## Advanced examples:
-- Agent Invitations: <https://github.com/hmrc/agent-invitations-frontend/tree/master/app/uk/gov/hmrc/agentinvitationsfrontend/journeys>
-- Agent-Client relationships management help-desk: <TBC>
+- Agent Invitations: 
+    - Models: <https://github.com/hmrc/agent-invitations-frontend/tree/master/app/uk/gov/hmrc/agentinvitationsfrontend/journeys>
+    - Controllers: <https://github.com/hmrc/agent-invitations-frontend/blob/master/app/uk/gov/hmrc/agentinvitationsfrontend/controllers/>
+- Agent-Client relationships management help-desk: 
+    - Models: <https://github.com/hmrc/agent-client-management-helpdesk-frontend/blob/master/app/uk/gov/hmrc/agentclientmanagementhelpdeskfrontend/journeys/>
+    - Controllers: <https://github.com/hmrc/agent-client-management-helpdesk-frontend/blob/master/app/uk/gov/hmrc/agentclientmanagementhelpdeskfrontend/controllers/>
 
 ## Best practices
 - Keep a single model definition in a single file.
@@ -95,9 +102,6 @@ or
 - Do NOT put functions and framework components in a state; a state should be immutable and serializable.
 - Define transitions using curried methods. It works well with action builders.
 - When the transition depends on some external operation(s), pass it as a function(s).
-- GET actions should be idempotent, i.e. should only render existing or historical state.
-- POST actions should always invoke some state transition and be followed be a redirect.
-- Generate backlink using provided `getCallFor` and breadcrumbs head state if any.
 
 ## Common patterns
 
