@@ -58,7 +58,11 @@ In your SBT build add:
 
     resolvers += Resolver.bintrayRepo("hmrc", "releases")
     
-    libraryDependencies += "uk.gov.hmrc" %% "play-fsm" % "0.9.0-play-25"
+    libraryDependencies += "uk.gov.hmrc" %% "play-fsm" % "0.x.0-play-25"
+    
+or 
+    
+    libraryDependencies += "uk.gov.hmrc" %% "play-fsm" % "0.x.0-play-26"
     
 ### How to build a model?
 - First, try to visualise user interacting with your application in any possible way. 
