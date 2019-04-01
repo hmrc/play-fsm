@@ -59,18 +59,17 @@ class DummyJourneyController @Inject()(override val journeyService: DummyJourney
   }
 
   private def backLinkFor(breadcrumbs: List[State])(implicit request: Request[_]): String =
-    breadcrumbs.headOption.map(b => getCallFor(b)(request)).getOrElse(Call("GET", "/")).url
+    breadcrumbs.headOption.map(getCallFor).getOrElse(Call("GET", "/")).url
 
   /** implement this to render state after transition or when form validation fails */
   override def renderState(
     state: journeyService.model.State,
     breadcrumbs: List[journeyService.model.State],
-    formWithErrors: Option[Form[_]]): Route =
-    implicit request =>
-      state match {
-        case State.Start         => Ok(Html(s"""Start | <a href="${backLinkFor(breadcrumbs)}">back</a>"""))
-        case State.Continue(arg) => Ok(s"Continue with $arg and form ${formWithErrors.or(ArgForm)}")
-        case State.Stop(result)  => Ok(s"Result is $result")
+    formWithErrors: Option[Form[_]])(implicit request: Request[_]): Result =
+    state match {
+      case State.Start         => Ok(Html(s"""Start | <a href="${backLinkFor(breadcrumbs)}">back</a>"""))
+      case State.Continue(arg) => Ok(s"Continue with $arg and form ${formWithErrors.or(ArgForm)}")
+      case State.Stop(result)  => Ok(s"Result is $result")
     }
 }
 

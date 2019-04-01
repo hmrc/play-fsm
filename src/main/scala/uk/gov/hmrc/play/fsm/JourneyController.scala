@@ -48,14 +48,14 @@ trait JourneyController {
   import journeyService.StateAndBreadcrumbs
   import journeyService.model.{State, Transition, TransitionNotAllowed}
 
-  type Route = Request[_] => Result
-
   /** implement this to map states into endpoints for redirection and back linking */
   def getCallFor(state: State)(implicit request: Request[_]): Call
 
   /** implement this to render state after transition or when form validation fails */
-  def renderState(state: State, breadcrumbs: List[State], formWithErrors: Option[Form[_]]): Route
+  def renderState(state: State, breadcrumbs: List[State], formWithErrors: Option[Form[_]])(
+    implicit request: Request[_]): Result
 
+  type Route        = Request[_] => Result
   type RouteFactory = StateAndBreadcrumbs => Route
 
   /** displays template for the state and breadcrumbs */
