@@ -48,6 +48,9 @@ trait JourneyController {
   import journeyService.StateAndBreadcrumbs
   import journeyService.model.{State, Transition, TransitionNotAllowed}
 
+  /** root call of this journey, used as fallback for back links*/
+  val root: Call
+
   /** implement this to map states into endpoints for redirection and back linking */
   def getCallFor(state: State)(implicit request: Request[_]): Call
 
@@ -78,6 +81,9 @@ trait JourneyController {
         case TransitionNotAllowed(origin, breadcrumbs, _) =>
           routeFactory(origin, breadcrumbs)(request) // renders current state back
       }
+
+  protected def backLinkFor(breadcrumbs: List[State])(implicit request: Request[_]): String =
+    breadcrumbs.headOption.map(getCallFor).getOrElse(root).url
 
   protected final def action(body: Request[_] => Future[Result]): Action[AnyContent] = Action.async {
     implicit request =>

@@ -19,6 +19,8 @@ class DummyJourneyController @Inject()(override val journeyService: DummyJourney
   import DummyJourneyController._
   import journeyService.model.{State, Transitions}
 
+  val root: Call = Call("GET", "/")
+
   val asUser: WithAuthorised[Int] = { implicit request => body =>
     body(5)
   }
@@ -57,9 +59,6 @@ class DummyJourneyController @Inject()(override val journeyService: DummyJourney
     case State.Continue(_) => Call("GET", "/continue")
     case State.Stop(_)     => Call("GET", "/stop")
   }
-
-  private def backLinkFor(breadcrumbs: List[State])(implicit request: Request[_]): String =
-    breadcrumbs.headOption.map(getCallFor).getOrElse(Call("GET", "/")).url
 
   /** implement this to render state after transition or when form validation fails */
   override def renderState(
