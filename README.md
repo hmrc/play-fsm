@@ -77,7 +77,7 @@ or
 
 ### How to define a controller?
 - Create a controller as usual extending `JourneyController` trait.
-- Decide 3 things:
+- Decide 2 things:
     - How to wire action calls into model transitions, use provided action helpers selection, see <https://github.com/hmrc/play-fsm/blob/master/src/test/scala/uk/gov/hmrc/play/fsm/DummyJourneyController.scala>.
     - How to display the state after GET call, implement `renderState`
 - Map all GET calls to states, implement `getCallFor` method
