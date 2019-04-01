@@ -9,17 +9,17 @@ This library provides State Machine building blocks for a stateful Play applicat
 - `JsonStateFormats` state to json serialization and deserialization builder
     
 ## Motivation
-Managing adequately complex stateful behaviour in an application is a challenge. 
+Managing adequately complex stateful user journey leading to the business transaction in an application is a challenge. 
 It is even more of a challenge in a traditional server-oriented web application built on top of a stateless-by-design HTTP protocol.
 
 Common requirements are:
 - the application has to accumulate business transaction input based on multiple prior interactions with the user
-- depending on the user selections and decisions various business outcomes are possible (including lack of action)
-- only a few possible journey paths are permitted, the application has to validate each time if the request can be accepted given the current state
+- depending on the user selections and decisions various business outcomes are possible (including final lack of action)
+- only a few possible journey paths are permitted, the application has to validate each time what user can do given the current state
 - the application must be able to acquire, cache and show additional data sourced asynchronously from upstream services
 - user must be able to go back and change her input before final transaction will take place
 - out-of-order and rogue request handling, introducing malformed state leading to invalid business transaction has to be prevented
-- the testability of an application must not be compromised by implementation complexity
+- the testability of an application must not be compromised by the intrinsic implementation complexities
 
 ## Solution
 State Machine is an established pattern to manage complex internal state flow based on a set of transition rules. 
