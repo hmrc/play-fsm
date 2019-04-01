@@ -82,8 +82,8 @@ trait JourneyController {
           routeFactory(origin, breadcrumbs)(request) // renders current state back
       }
 
-  protected def backLinkFor(breadcrumbs: List[State])(implicit request: Request[_]): String =
-    breadcrumbs.headOption.map(getCallFor).getOrElse(root).url
+  protected def backLinkFor(breadcrumbs: List[State])(implicit request: Request[_]): Call =
+    breadcrumbs.headOption.map(getCallFor).getOrElse(root)
 
   protected final def action(body: Request[_] => Future[Result]): Action[AnyContent] = Action.async {
     implicit request =>

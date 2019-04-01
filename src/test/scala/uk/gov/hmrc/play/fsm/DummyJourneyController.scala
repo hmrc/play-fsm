@@ -66,7 +66,7 @@ class DummyJourneyController @Inject()(override val journeyService: DummyJourney
     breadcrumbs: List[journeyService.model.State],
     formWithErrors: Option[Form[_]])(implicit request: Request[_]): Result =
     state match {
-      case State.Start         => Ok(Html(s"""Start | <a href="${backLinkFor(breadcrumbs)}">back</a>"""))
+      case State.Start         => Ok(Html(s"""Start | <a href="${backLinkFor(breadcrumbs).url}">back</a>"""))
       case State.Continue(arg) => Ok(s"Continue with $arg and form ${formWithErrors.or(ArgForm)}")
       case State.Stop(result)  => Ok(s"Result is $result")
     }
