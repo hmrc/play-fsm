@@ -119,8 +119,10 @@ trait JourneyController {
       .fold(
         formWithErrors =>
           journeyService.currentState.flatMap {
-            case Some((state, breadcrumbs)) =>
-              Future.successful(renderState(state, breadcrumbs, Some(formWithErrors))(request))
+            case Some((state, _)) =>
+              Future.successful(
+                Redirect(getCallFor(state))
+                  .flashing(Flash(formWithErrors.data)))
             case None =>
               apply(journeyService.model.start, redirect)
         },
@@ -185,7 +187,8 @@ trait JourneyController {
     ec: ExecutionContext): Future[Result] = stateAndBreadcrumbsOpt match {
     case None => apply(journeyService.model.start, redirect)
     case Some((state, breadcrumbs)) =>
-      if (filter.isDefinedAt(state)) Future.successful(renderState(state, breadcrumbs, None)(request))
+      if (filter.isDefinedAt(state))
+        Future.successful(renderState(state, breadcrumbs, None)(request))
       else journeyService.stepBack.flatMap(stepBackUntil(filter))
   }
 }

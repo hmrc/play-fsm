@@ -19,6 +19,7 @@ package uk.gov.hmrc.play.fsm
 import org.scalatestplus.play.OneAppPerSuite
 import play.api.Application
 import play.api.inject.guice.GuiceApplicationBuilder
+import play.api.mvc.Flash
 import play.api.test.FakeRequest
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.test.UnitSpec
@@ -78,8 +79,9 @@ class DummyJourneyControllerSpec extends UnitSpec with OneAppPerSuite with State
     "after invalid POST /continue stay in Start when in Start" in {
       journeyState.set(State.Start, Nil)
       val result = controller.continue(FakeRequest().withFormUrlEncodedBody())
-      status(result)   shouldBe 200
-      journeyState.get should have[State](State.Start, Nil)
+      status(result)           shouldBe 303
+      redirectLocation(result) shouldBe Some("/start")
+      journeyState.get         should have[State](State.Start, Nil)
     }
 
     "after POST /continue transition to Continue when in Continue" in {
@@ -88,6 +90,15 @@ class DummyJourneyControllerSpec extends UnitSpec with OneAppPerSuite with State
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/continue")
       journeyState.get         should have[State](State.Continue("dummy,foo"), List(State.Continue("dummy"), State.Start))
+    }
+
+    "after invalid POST /continue stay in Continue when in Continue" in {
+      journeyState.set(State.Continue("dummy"), List(State.Start))
+      val result = controller.continue(FakeRequest().withFormUrlEncodedBody("foo" -> "arg"))
+      status(result)           shouldBe 303
+      redirectLocation(result) shouldBe Some("/continue")
+      flash(result)            shouldBe Flash(Map("foo" -> "arg"))
+      journeyState.get         should have[State](State.Continue("dummy"), List(State.Start))
     }
 
     "after POST /continue stay in Stop when in Stop" in {
