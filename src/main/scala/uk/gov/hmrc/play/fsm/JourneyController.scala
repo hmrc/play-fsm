@@ -128,7 +128,10 @@ trait JourneyController {
             case Some((state, _)) =>
               Future.successful(
                 Redirect(getCallFor(state))
-                  .flashing(Flash(formWithErrors.data)))
+                  .flashing(Flash {
+                    val data = formWithErrors.data
+                    if (data.isEmpty) Map("dummy" -> "") else data
+                  }))
             case None =>
               apply(journeyService.model.start, redirect)
         },
