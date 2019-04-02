@@ -1,6 +1,6 @@
 package uk.gov.hmrc.play.fsm
 import play.api.data.Form
-import play.api.mvc.Request
+import play.api.mvc.{Flash, Request}
 
 object OptionalFormOps {
   implicit class OptionalForm(val formOpt: Option[Form[_]]) extends AnyVal {
@@ -8,7 +8,7 @@ object OptionalFormOps {
       formOpt
         .map(_.asInstanceOf[Form[T]])
         .getOrElse({
-          if (request.flash.isEmpty) other else other.bind(request.flash.data)
+          if (request.cookies.get(Flash.COOKIE_NAME).isDefined) other.bind(request.flash.data) else other
         })
   }
 }
