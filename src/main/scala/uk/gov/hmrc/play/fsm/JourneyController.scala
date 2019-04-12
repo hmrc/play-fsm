@@ -21,12 +21,10 @@ import scala.concurrent.{ExecutionContext, Future}
   *   - authorisedWithBootstrapAndForm
   *   - authorisedShowCurrentStateWhen
   */
-trait JourneyController {
+trait JourneyController extends HeaderCarrierProvider {
 
   /** This has to be injected in the concrete controller */
   val journeyService: JourneyService
-
-  def hc(implicit rh: RequestHeader): HeaderCarrier
 
   import journeyService.StateAndBreadcrumbs
   import journeyService.model.{State, Transition, TransitionNotAllowed}
