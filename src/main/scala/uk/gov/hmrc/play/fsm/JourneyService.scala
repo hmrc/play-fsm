@@ -42,11 +42,21 @@ trait JourneyService {
 
 }
 
+/**
+  * This trait enhances JourneyService with StateAndBreadcrumbs persistence abstractions.
+  */
 trait PersistentJourneyService extends JourneyService {
 
   protected def fetch(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[StateAndBreadcrumbs]]
   protected def save(
     state: StateAndBreadcrumbs)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[StateAndBreadcrumbs]
+
+  /**
+    * Should clear state and breadcrumbs. Default implementation does nothing.
+    * Override to make the desired effect in your persistence layer of choice.
+    * Put here to enable an interaction between controller and persistence layers.
+    **/
+  def clear(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Unit] = Future.successful(())
 
   override def apply(
     transition: model.Transition)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[StateAndBreadcrumbs] =

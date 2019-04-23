@@ -28,6 +28,7 @@ class DummyJourneyService extends PersistentJourneyService {
   def get(implicit headerCarrier: HeaderCarrier, timeout: Duration, ec: ExecutionContext): Option[StateAndBreadcrumbs] =
     Await.result(fetch, timeout)
 
-  def clear(): Unit = storage.clear
+  override def clear(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Unit] =
+    Future.successful(storage.clear())
 
 }
