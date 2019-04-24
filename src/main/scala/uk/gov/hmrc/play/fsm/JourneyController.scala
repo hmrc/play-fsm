@@ -20,6 +20,10 @@ import scala.concurrent.{ExecutionContext, Future}
   *   - authorisedWithForm
   *   - authorisedWithBootstrapAndForm
   *   - authorisedShowCurrentStateWhen
+  *   - whenCurrentStateMatches
+  *   - showCurrentStateWhen
+  *   - whenAuthorisedAndCurrentStateMatches
+  *   - showCurrentStateWhenAuthorised
   */
 trait JourneyController extends HeaderCarrierProvider {
 
@@ -43,11 +47,11 @@ trait JourneyController extends HeaderCarrierProvider {
   type RouteFactory = StateAndBreadcrumbs => Route
 
   /** displays template for the state and breadcrumbs */
-  final val display: RouteFactory = (state: StateAndBreadcrumbs) =>
+  val display: RouteFactory = (state: StateAndBreadcrumbs) =>
     (request: Request[_]) => renderState(state._1, state._2, None)(request)
 
   /** redirects to the endpoint matching state */
-  final val redirect: RouteFactory =
+  val redirect: RouteFactory =
     (state: StateAndBreadcrumbs) => (request: Request[_]) => Results.Redirect(getCallFor(state._1)(request))
 
   /** applies transition to the current state */
@@ -89,8 +93,10 @@ trait JourneyController extends HeaderCarrierProvider {
     }
 
   protected final def authorisedWithBootstrapAndForm[User, Payload, T](bootstrap: Transition)(
-    withAuthorised: WithAuthorised[User])(form: Form[Payload])(
-    transition: User => Payload => Transition)(implicit hc: HeaderCarrier, request: Request[_], ec: ExecutionContext) =
+    withAuthorised: WithAuthorised[User])(form: Form[Payload])(transition: User => Payload => Transition)(
+    implicit hc: HeaderCarrier,
+    request: Request[_],
+    ec: ExecutionContext): Future[Result] =
     withAuthorised(request) { user: User =>
       journeyService
         .apply(bootstrap)
@@ -124,35 +130,43 @@ trait JourneyController extends HeaderCarrierProvider {
 
   protected final def showCurrentStateWhen(expectedStates: ExpectedStates)(
     implicit ec: ExecutionContext): Action[AnyContent] =
+    whenCurrentStateMatches(expectedStates)(redirect)(ec)
+
+  protected final def whenCurrentStateMatches(expectedStates: ExpectedStates)(routeFactory: RouteFactory)(
+    implicit ec: ExecutionContext): Action[AnyContent] =
     action { implicit request =>
       implicit val headerCarrier: HeaderCarrier = hc(request)
       for {
         stateAndBreadcrumbsOpt <- journeyService.currentState
         result <- stateAndBreadcrumbsOpt match {
-                   case None => apply(journeyService.model.start, redirect)
+                   case None => apply(journeyService.model.start, routeFactory)
                    case Some(stateAndBreadcrumbs) =>
                      if (hasMatchingState(expectedStates, stateAndBreadcrumbs))
                        journeyService.currentState
                          .flatMap(stepBackUntil(expectedStates))
-                     else apply(journeyService.model.start, redirect)
+                     else apply(journeyService.model.start, routeFactory)
                  }
       } yield result
     }
 
   protected final def showCurrentStateWhenAuthorised[User](withAuthorised: WithAuthorised[User])(
     expectedStates: ExpectedStates)(implicit ec: ExecutionContext): Action[AnyContent] =
+    whenAuthorisedAndCurrentStateMatches(withAuthorised)(expectedStates)(redirect)(ec)
+
+  protected final def whenAuthorisedAndCurrentStateMatches[User](withAuthorised: WithAuthorised[User])(
+    expectedStates: ExpectedStates)(routeFactory: RouteFactory)(implicit ec: ExecutionContext): Action[AnyContent] =
     action { implicit request =>
       implicit val headerCarrier: HeaderCarrier = hc(request)
       withAuthorised(request) { _ =>
         for {
           stateAndBreadcrumbsOpt <- journeyService.currentState
           result <- stateAndBreadcrumbsOpt match {
-                     case None => apply(journeyService.model.start, redirect)
+                     case None => apply(journeyService.model.start, routeFactory)
                      case Some(stateAndBreadcrumbs) =>
                        if (hasMatchingState(expectedStates, stateAndBreadcrumbs))
                          journeyService.currentState
                            .flatMap(stepBackUntil(expectedStates))
-                       else apply(journeyService.model.start, redirect)
+                       else apply(journeyService.model.start, routeFactory)
                    }
         } yield result
       }
