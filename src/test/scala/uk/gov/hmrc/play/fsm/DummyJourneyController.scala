@@ -4,17 +4,15 @@ import play.api.data.Form
 import play.api.data.Forms.{single, text}
 import play.api.mvc._
 import play.twirl.api.Html
-import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.play.fsm.OptionalFormOps._
 
 import scala.concurrent.ExecutionContext
-import OptionalFormOps._
 
 @Singleton
 class DummyJourneyController @Inject()(override val journeyService: DummyJourneyService)(implicit ec: ExecutionContext)
     extends Controller
-    with JourneyController {
-
-  override implicit def hc(implicit rh: RequestHeader): HeaderCarrier = HeaderCarrier()
+    with JourneyController
+    with JourneyIdSupport {
 
   import DummyJourneyController._
   import journeyService.model.{State, Transitions}
@@ -28,12 +26,15 @@ class DummyJourneyController @Inject()(override val journeyService: DummyJourney
   // ACTIONS
 
   val start: Action[AnyContent] = action { implicit request =>
-    journeyService.cleanBreadcrumbs.flatMap(_ => apply(journeyService.model.start, display))
+    withJourneyId {
+      journeyService.cleanBreadcrumbs
+        .flatMap(_ => apply(journeyService.model.start, display))
+    }
   }
 
-  val showStart: Action[AnyContent] = showCurrentStateWhen {
+  val showStart: Action[AnyContent] = whenCurrentStateMatches {
     case State.Start =>
-  }
+  }(displayOrRedirectWithJourneyId)
 
   def continue: Action[AnyContent] = action { implicit request =>
     authorisedWithForm(asUser)(ArgForm)(Transitions.continue)

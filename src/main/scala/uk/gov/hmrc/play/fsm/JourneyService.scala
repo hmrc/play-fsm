@@ -24,6 +24,7 @@ import scala.concurrent.{ExecutionContext, Future}
   */
 trait JourneyService {
 
+  val journeyKey: String
   val model: JourneyModel
 
   type StateAndBreadcrumbs = (model.State, List[model.State])

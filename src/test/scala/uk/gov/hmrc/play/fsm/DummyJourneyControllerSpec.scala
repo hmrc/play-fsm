@@ -39,9 +39,17 @@ class DummyJourneyControllerSpec extends UnitSpec with OneAppPerSuite with State
   import journeyState.model.State
 
   "DummyJourneyController" should {
-    "after POST /start transition to Start" in {
+    "after POST /start without journeyId redirect" in {
       journeyState.clear
       val result = controller.start(FakeRequest())
+      status(result)                                            shouldBe 303
+      redirectLocation(result)                                  shouldBe Some("/")
+      session(result).get(controller.journeyService.journeyKey) shouldBe defined
+    }
+
+    "after POST /start with journeyId transition to Start" in {
+      journeyState.clear
+      val result = controller.start(FakeRequest().withSession(controller.journeyService.journeyKey -> "fooId"))
       status(result)   shouldBe 200
       journeyState.get should have[State](State.Start, Nil)
     }

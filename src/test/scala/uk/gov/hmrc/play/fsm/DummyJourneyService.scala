@@ -8,8 +8,9 @@ import scala.concurrent.{Await, ExecutionContext, Future}
 @Singleton
 class DummyJourneyService extends PersistentJourneyService {
 
-  override val model = DummyJourneyModel
-  val storage        = new TestStorage[(model.State, List[model.State])] {}
+  override val journeyKey: String = "DummyJourney"
+  override val model              = DummyJourneyModel
+  val storage                     = new TestStorage[(model.State, List[model.State])] {}
 
   override protected def fetch(
     implicit hc: HeaderCarrier,
