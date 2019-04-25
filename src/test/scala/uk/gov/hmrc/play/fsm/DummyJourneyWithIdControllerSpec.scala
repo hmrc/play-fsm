@@ -27,21 +27,29 @@ import uk.gov.hmrc.play.test.UnitSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class DummyJourneyControllerSpec extends UnitSpec with OneAppPerSuite with StateAndBreadcrumbsMatchers {
+class DummyJourneyWithIdControllerSpec extends UnitSpec with OneAppPerSuite with StateAndBreadcrumbsMatchers {
 
   implicit val hc: HeaderCarrier = HeaderCarrier()
 
   override lazy val app: Application = new GuiceApplicationBuilder().build()
 
-  lazy val journeyState: DummyJourneyService  = app.injector.instanceOf[DummyJourneyService]
-  lazy val controller: DummyJourneyController = app.injector.instanceOf[DummyJourneyController]
+  lazy val journeyState: DummyJourneyService        = app.injector.instanceOf[DummyJourneyService]
+  lazy val controller: DummyJourneyWithIdController = app.injector.instanceOf[DummyJourneyWithIdController]
 
   import journeyState.model.State
 
-  def fakeRequest = FakeRequest()
+  def fakeRequest = FakeRequest().withSession(controller.journeyService.journeyKey -> "fooId")
 
-  "DummyJourneyController" should {
-    "after POST /start transition to Start" in {
+  "DummyJourneyWithIdController" should {
+    "after POST /start without journeyId redirect" in {
+      journeyState.clear
+      val result = controller.start(FakeRequest())
+      status(result)                                            shouldBe 303
+      redirectLocation(result)                                  shouldBe Some("/")
+      session(result).get(controller.journeyService.journeyKey) shouldBe defined
+    }
+
+    "after POST /start with journeyId transition to Start" in {
       journeyState.clear
       val result = controller.start(fakeRequest)
       status(result)   shouldBe 200

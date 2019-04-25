@@ -1,7 +1,7 @@
 package uk.gov.hmrc.play.fsm
+
 import javax.inject.{Inject, Singleton}
 import play.api.data.Form
-import play.api.data.Forms.{single, text}
 import play.api.mvc._
 import play.twirl.api.Html
 import uk.gov.hmrc.http.HeaderCarrier
@@ -10,14 +10,17 @@ import uk.gov.hmrc.play.fsm.OptionalFormOps._
 import scala.concurrent.ExecutionContext
 
 @Singleton
-class DummyJourneyController @Inject()(override val journeyService: DummyJourneyService)(implicit ec: ExecutionContext)
+class DummyJourneyWithIdController @Inject()(override val journeyService: DummyJourneyService)(
+  implicit ec: ExecutionContext)
     extends Controller
-    with JourneyController {
+    with JourneyController
+    with JourneyIdSupport {
 
   import DummyJourneyController._
   import journeyService.model.{State, Transitions}
 
-  override implicit def hc(implicit rh: RequestHeader): HeaderCarrier = HeaderCarrier()
+  override implicit def hc(implicit rh: RequestHeader): HeaderCarrier =
+    appendJourneyId(HeaderCarrier())
 
   val root: Call = Call("GET", "/")
 
@@ -71,14 +74,4 @@ class DummyJourneyController @Inject()(override val journeyService: DummyJourney
       case State.Continue(arg) => Ok(s"Continue with $arg and form ${formWithErrors.or(ArgForm)}")
       case State.Stop(result)  => Ok(s"Result is $result")
     }
-}
-
-object DummyJourneyController {
-
-  val ArgForm: Form[String] = Form(
-    single(
-      "arg" -> text
-    )
-  )
-
 }

@@ -18,19 +18,11 @@ trait JourneyIdSupport {
   def appendJourneyId(result: Result)(implicit rh: RequestHeader): Result =
     result.withSession(journeyService.journeyKey -> journeyId(rh).getOrElse(UUID.randomUUID().toString))
 
-  def withJourneyId(body: => Future[Result])(implicit request: Request[_]): Future[Result] =
+  override def withValidRequest(body: => Future[Result])(implicit request: Request[_]): Future[Result] =
     journeyId match {
       case None =>
         Future.successful(appendJourneyId(Results.Redirect(request.uri))(request))
       case _ => body
-    }
-
-  val displayOrRedirectWithJourneyId: RouteFactory =
-    (state: journeyService.StateAndBreadcrumbs) =>
-      (request: Request[_]) =>
-        journeyId(request) match {
-          case None => appendJourneyId(Results.Redirect(getCallFor(state._1)(request)))(request)
-          case _    => renderState(state._1, state._2, None)(request)
     }
 
 }

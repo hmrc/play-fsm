@@ -36,12 +36,15 @@ trait JourneyController extends HeaderCarrierProvider {
   /** root call of this journey, used as fallback for back links*/
   val root: Call
 
-  /** implement this to map states into endpoints for redirection and back linking */
+  /** implement to map states into endpoints for redirection and back linking */
   def getCallFor(state: State)(implicit request: Request[_]): Call
 
-  /** implement this to render state after transition or when form validation fails */
+  /** implement to render state after transition or when form validation fails */
   def renderState(state: State, breadcrumbs: List[State], formWithErrors: Option[Form[_]])(
     implicit request: Request[_]): Result
+
+  /** interceptor: override to do basic checks on every incoming request (headers, session, etc.) */
+  def withValidRequest(body: => Future[Result])(implicit request: Request[_]): Future[Result] = body
 
   type Route        = Request[_] => Result
   type RouteFactory = StateAndBreadcrumbs => Route
@@ -72,7 +75,7 @@ trait JourneyController extends HeaderCarrierProvider {
 
   protected final def action(body: Request[_] => Future[Result]): Action[AnyContent] = Action.async {
     implicit request =>
-      body(request)
+      withValidRequest(body(request))
   }
 
   type WithAuthorised[User] = Request[_] => (User => Future[Result]) => Future[Result]
