@@ -33,9 +33,6 @@ trait JourneyController extends HeaderCarrierProvider {
   import journeyService.StateAndBreadcrumbs
   import journeyService.model.{State, Transition, TransitionNotAllowed}
 
-  /** root call of this journey, used as fallback for back links*/
-  val root: Call
-
   /** implement to map states into endpoints for redirection and back linking */
   def getCallFor(state: State)(implicit request: Request[_]): Call
 
@@ -71,7 +68,7 @@ trait JourneyController extends HeaderCarrierProvider {
       }
 
   protected def backLinkFor(breadcrumbs: List[State])(implicit request: Request[_]): Call =
-    breadcrumbs.headOption.map(getCallFor).getOrElse(root)
+    breadcrumbs.headOption.map(getCallFor).getOrElse(getCallFor(journeyService.model.root))
 
   protected final def action(body: Request[_] => Future[Result]): Action[AnyContent] = Action.async {
     implicit request =>

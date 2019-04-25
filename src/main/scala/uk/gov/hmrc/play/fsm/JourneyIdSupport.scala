@@ -21,7 +21,7 @@ trait JourneyIdSupport {
   override def withValidRequest(body: => Future[Result])(implicit request: Request[_]): Future[Result] =
     journeyId match {
       case None =>
-        Future.successful(appendJourneyId(Results.Redirect(root))(request))
+        Future.successful(appendJourneyId(Results.Redirect(getCallFor(journeyService.model.root)))(request))
       case _ => body
     }
 

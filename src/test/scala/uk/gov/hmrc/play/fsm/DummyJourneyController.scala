@@ -19,8 +19,6 @@ class DummyJourneyController @Inject()(override val journeyService: DummyJourney
 
   override implicit def hc(implicit rh: RequestHeader): HeaderCarrier = HeaderCarrier()
 
-  val root: Call = Call("GET", "/")
-
   val asUser: WithAuthorised[Int] = { implicit request => body =>
     body(5)
   }

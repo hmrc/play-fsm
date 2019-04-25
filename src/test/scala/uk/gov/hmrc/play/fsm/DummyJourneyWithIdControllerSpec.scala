@@ -45,7 +45,7 @@ class DummyJourneyWithIdControllerSpec extends UnitSpec with OneAppPerSuite with
       journeyState.clear
       val result = controller.start(FakeRequest())
       status(result)                                            shouldBe 303
-      redirectLocation(result)                                  shouldBe Some("/")
+      redirectLocation(result)                                  shouldBe Some("/start")
       session(result).get(controller.journeyService.journeyKey) shouldBe defined
     }
 
