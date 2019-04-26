@@ -95,7 +95,7 @@ trait PersistentJourneyService extends JourneyService {
       initialState <- Future.successful {
                        stateAndBreadcrumbsOpt match {
                          case None                   => model.root
-                         case Some((_, breadcrumbs)) => breadcrumbs.last
+                         case Some((_, breadcrumbs)) => breadcrumbs.lastOption.getOrElse(model.root)
                        }
                      }
     } yield initialState
