@@ -120,11 +120,11 @@ class JourneyServiceSpec extends UnitSpec {
   "clean breadcrumbs" in {
     await(testService.save(("foo", Nil)))
     await(testService.save(("bar", List("foo"))))
-    await(testService.fetch)            shouldBe Some(("bar", List("foo")))
-    await(testService.cleanBreadcrumbs) shouldBe List("foo")
-    await(testService.fetch)            shouldBe Some(("bar", Nil))
-    await(testService.cleanBreadcrumbs) shouldBe Nil
-    await(testService.fetch)            shouldBe Some(("bar", Nil))
+    await(testService.fetch)              shouldBe Some(("bar", List("foo")))
+    await(testService.cleanBreadcrumbs()) shouldBe List("foo")
+    await(testService.fetch)              shouldBe Some(("bar", Nil))
+    await(testService.cleanBreadcrumbs()) shouldBe Nil
+    await(testService.fetch)              shouldBe Some(("bar", Nil))
   }
 
 }

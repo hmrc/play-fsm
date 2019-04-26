@@ -39,8 +39,9 @@ trait JourneyService {
   def stepBack(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[StateAndBreadcrumbs]]
 
   /** Cleans breadcrumbs from the session and returns removed list */
-  def cleanBreadcrumbs(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[List[model.State]]
-
+  def cleanBreadcrumbs(filter: List[model.State] => List[model.State])(
+    implicit hc: HeaderCarrier,
+    ec: ExecutionContext): Future[List[model.State]]
 }
 
 /**
@@ -59,6 +60,12 @@ trait PersistentJourneyService extends JourneyService {
     **/
   def clear(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Unit] = Future.successful(())
 
+  /**
+    * Default retention strategy is to keep always last 9 states.
+    * Override to provide your own strategy.
+    */
+  val breadcrumbsRetentionStrategy: List[model.State] => List[model.State] = _.take(9)
+
   override def apply(
     transition: model.Transition)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[StateAndBreadcrumbs] =
     for {
@@ -69,7 +76,7 @@ trait PersistentJourneyService extends JourneyService {
           case None      => (model.root, Nil)
         }
         if (transition.apply.isDefinedAt(state)) transition.apply(state) flatMap { endState =>
-          save((endState, if (endState == state) breadcrumbs else state :: breadcrumbs.take(9)))
+          save((endState, if (endState == state) breadcrumbs else state :: breadcrumbsRetentionStrategy(breadcrumbs)))
         } else
           // throw an exception to give outer layer a chance to stay in sync (e.g. redirect back to the current state)
           model.fail(model.TransitionNotAllowed(state, breadcrumbs, transition))
@@ -90,12 +97,14 @@ trait PersistentJourneyService extends JourneyService {
         case None => Future.successful(None)
       }
 
-  override def cleanBreadcrumbs(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[List[model.State]] =
+  override def cleanBreadcrumbs(filter: List[model.State] => List[model.State] = _ => Nil)(
+    implicit hc: HeaderCarrier,
+    ec: ExecutionContext): Future[List[model.State]] =
     for {
       stateAndBreadcrumbsOpt <- fetch
       breadcrumbs <- stateAndBreadcrumbsOpt match {
                       case None                       => Future.successful(Nil)
-                      case Some((state, breadcrumbs)) => save((state, Nil)).map(_ => breadcrumbs)
+                      case Some((state, breadcrumbs)) => save((state, filter(breadcrumbs))).map(_ => breadcrumbs)
                     }
     } yield breadcrumbs
 

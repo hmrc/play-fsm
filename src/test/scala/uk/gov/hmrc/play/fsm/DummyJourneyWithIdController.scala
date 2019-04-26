@@ -30,7 +30,8 @@ class DummyJourneyWithIdController @Inject()(override val journeyService: DummyJ
   // ACTIONS
 
   val start: Action[AnyContent] = action { implicit request =>
-    journeyService.cleanBreadcrumbs
+    journeyService
+      .cleanBreadcrumbs(_ => Nil)
       .flatMap(_ => apply(journeyService.model.start, display))
   }
 
