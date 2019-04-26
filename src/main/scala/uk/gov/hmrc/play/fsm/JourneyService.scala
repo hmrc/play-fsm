@@ -33,10 +33,13 @@ trait JourneyService {
   /** Applies transition to the current state and returns new state or error */
   def apply(transition: model.Transition)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[StateAndBreadcrumbs]
 
-  /** Return current state (if any) and breadcrumbs */
+  /** Returns current state (if any) and breadcrumbs */
   def currentState(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[StateAndBreadcrumbs]]
 
-  /** Step back to previous state (if any) and breadcrumbs */
+  /** Returns initial state found in breadcrumbs or the root state if breadcrumbs are empty */
+  def initialState(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[model.State]
+
+  /** Steps back to previous state and breadcrumbs (if any) */
   def stepBack(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[StateAndBreadcrumbs]]
 
   /** Cleans breadcrumbs from the session and returns removed list */
@@ -85,6 +88,17 @@ trait PersistentJourneyService extends JourneyService {
 
   override def currentState(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[StateAndBreadcrumbs]] =
     fetch
+
+  override def initialState(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[model.State] =
+    for {
+      stateAndBreadcrumbsOpt <- fetch
+      initialState <- Future.successful {
+                       stateAndBreadcrumbsOpt match {
+                         case None                   => model.root
+                         case Some((_, breadcrumbs)) => breadcrumbs.last
+                       }
+                     }
+    } yield initialState
 
   override def stepBack(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[StateAndBreadcrumbs]] =
     fetch

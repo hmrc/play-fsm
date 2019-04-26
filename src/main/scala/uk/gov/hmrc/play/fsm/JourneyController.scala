@@ -41,7 +41,9 @@ trait JourneyController extends HeaderCarrierProvider {
     implicit request: Request[_]): Result
 
   /** interceptor: override to do basic checks on every incoming request (headers, session, etc.) */
-  def withValidRequest(body: => Future[Result])(implicit request: Request[_]): Future[Result] = body
+  def withValidRequest(
+    body: => Future[Result])(implicit hc: HeaderCarrier, request: Request[_], ec: ExecutionContext): Future[Result] =
+    body
 
   type Route        = Request[_] => Result
   type RouteFactory = StateAndBreadcrumbs => Route
@@ -70,10 +72,11 @@ trait JourneyController extends HeaderCarrierProvider {
   protected def backLinkFor(breadcrumbs: Breadcrumbs)(implicit request: Request[_]): Call =
     breadcrumbs.headOption.map(getCallFor).getOrElse(getCallFor(journeyService.model.root))
 
-  protected final def action(body: Request[_] => Future[Result]): Action[AnyContent] = Action.async {
-    implicit request =>
+  protected final def action(body: Request[_] => Future[Result])(implicit ec: ExecutionContext): Action[AnyContent] =
+    Action.async { implicit request =>
+      implicit val headerCarrier: HeaderCarrier = hc(request)
       withValidRequest(body(request))
-  }
+    }
 
   type WithAuthorised[User] = Request[_] => (User => Future[Result]) => Future[Result]
 
