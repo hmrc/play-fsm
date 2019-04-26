@@ -8,6 +8,7 @@ import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.fsm.OptionalFormOps._
 
 import scala.concurrent.ExecutionContext
+import scala.util.Success
 
 @Singleton
 class DummyJourneyWithIdController @Inject()(override val journeyService: DummyJourneyService)(
@@ -49,8 +50,12 @@ class DummyJourneyWithIdController @Inject()(override val journeyService: DummyJ
     authorised(asUser)(Transitions.stop)(redirect)
   }
 
-  val showStop: Action[AnyContent] = showCurrentStateWhenAuthorised(asUser) {
-    case State.Stop(_) =>
+  val showStop: Action[AnyContent] = action { implicit request =>
+    whenAuthorised(asUser) {
+      case State.Stop(_) =>
+    }(display).andThen {
+      case Success(_) => journeyService.clear
+    }
   }
 
   // VIEWS

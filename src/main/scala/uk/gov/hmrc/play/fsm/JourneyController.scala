@@ -136,18 +136,22 @@ trait JourneyController extends HeaderCarrierProvider {
     implicit ec: ExecutionContext): Action[AnyContent] =
     action { implicit request =>
       implicit val headerCarrier: HeaderCarrier = hc(request)
-      for {
-        stateAndBreadcrumbsOpt <- journeyService.currentState
-        result <- stateAndBreadcrumbsOpt match {
-                   case None => apply(journeyService.model.start, routeFactory)
-                   case Some(stateAndBreadcrumbs) =>
-                     if (hasMatchingState(expectedStates, stateAndBreadcrumbs))
-                       journeyService.currentState
-                         .flatMap(stepBackUntil(expectedStates))
-                     else apply(journeyService.model.start, routeFactory)
-                 }
-      } yield result
+      when(expectedStates)(routeFactory)
     }
+
+  protected final def when(expectedStates: ExpectedStates)(
+    routeFactory: RouteFactory)(implicit hc: HeaderCarrier, request: Request[_], ec: ExecutionContext): Future[Result] =
+    for {
+      stateAndBreadcrumbsOpt <- journeyService.currentState
+      result <- stateAndBreadcrumbsOpt match {
+                 case None => apply(journeyService.model.start, routeFactory)
+                 case Some(stateAndBreadcrumbs) =>
+                   if (hasMatchingState(expectedStates, stateAndBreadcrumbs))
+                     journeyService.currentState
+                       .flatMap(stepBackUntil(expectedStates))
+                   else apply(journeyService.model.start, routeFactory)
+               }
+    } yield result
 
   protected final def showCurrentStateWhenAuthorised[User](withAuthorised: WithAuthorised[User])(
     expectedStates: ExpectedStates)(implicit ec: ExecutionContext): Action[AnyContent] =
@@ -157,19 +161,13 @@ trait JourneyController extends HeaderCarrierProvider {
     expectedStates: ExpectedStates)(routeFactory: RouteFactory)(implicit ec: ExecutionContext): Action[AnyContent] =
     action { implicit request =>
       implicit val headerCarrier: HeaderCarrier = hc(request)
-      withAuthorised(request) { _ =>
-        for {
-          stateAndBreadcrumbsOpt <- journeyService.currentState
-          result <- stateAndBreadcrumbsOpt match {
-                     case None => apply(journeyService.model.start, routeFactory)
-                     case Some(stateAndBreadcrumbs) =>
-                       if (hasMatchingState(expectedStates, stateAndBreadcrumbs))
-                         journeyService.currentState
-                           .flatMap(stepBackUntil(expectedStates))
-                       else apply(journeyService.model.start, routeFactory)
-                   }
-        } yield result
-      }
+      whenAuthorised(withAuthorised)(expectedStates)(routeFactory)
+    }
+
+  protected final def whenAuthorised[User](withAuthorised: WithAuthorised[User])(expectedStates: ExpectedStates)(
+    routeFactory: RouteFactory)(implicit hc: HeaderCarrier, request: Request[_], ec: ExecutionContext): Future[Result] =
+    withAuthorised(request) { _ =>
+      when(expectedStates)(routeFactory)
     }
 
   @tailrec
