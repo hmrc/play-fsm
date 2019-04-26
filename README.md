@@ -7,6 +7,7 @@ This library provides State Machine building blocks for a stateful Play applicat
 - `PersistentJourneyService` persistence plug-in
 - `JourneyController` base controller trait with common action builders
 - `JsonStateFormats` state to json serialization and deserialization builder
+- `JourneyIdSupport` mix into JourneyController to feature unique journeyId in the Play session
     
 ## Motivation
 Managing adequately complex stateful user journey leading to the business transaction in an application is a challenge. 
@@ -52,7 +53,11 @@ External async requests to the upstream services should be provided as a functio
 
 ## How-tos
 
-### How to add play-fsm library to your service?
+### Where to start?
+
+You can use g8 template <https://github.com/hmrc/template-play-26-frontend-fsm.g8> as a start.
+
+### How to add play-fsm library to your existing service?
 
 In your SBT build add:
 
