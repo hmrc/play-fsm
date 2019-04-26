@@ -30,14 +30,14 @@ trait JourneyController extends HeaderCarrierProvider {
   /** This has to be injected in the concrete controller */
   val journeyService: JourneyService
 
-  import journeyService.StateAndBreadcrumbs
+  import journeyService.{Breadcrumbs, StateAndBreadcrumbs}
   import journeyService.model.{State, Transition, TransitionNotAllowed}
 
   /** implement to map states into endpoints for redirection and back linking */
   def getCallFor(state: State)(implicit request: Request[_]): Call
 
   /** implement to render state after transition or when form validation fails */
-  def renderState(state: State, breadcrumbs: List[State], formWithErrors: Option[Form[_]])(
+  def renderState(state: State, breadcrumbs: Breadcrumbs, formWithErrors: Option[Form[_]])(
     implicit request: Request[_]): Result
 
   /** interceptor: override to do basic checks on every incoming request (headers, session, etc.) */
@@ -67,7 +67,7 @@ trait JourneyController extends HeaderCarrierProvider {
           routeFactory(origin, breadcrumbs)(request) // renders current state back
       }
 
-  protected def backLinkFor(breadcrumbs: List[State])(implicit request: Request[_]): Call =
+  protected def backLinkFor(breadcrumbs: Breadcrumbs)(implicit request: Request[_]): Call =
     breadcrumbs.headOption.map(getCallFor).getOrElse(getCallFor(journeyService.model.root))
 
   protected final def action(body: Request[_] => Future[Result]): Action[AnyContent] = Action.async {

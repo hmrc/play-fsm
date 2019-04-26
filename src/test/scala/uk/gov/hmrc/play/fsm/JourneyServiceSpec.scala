@@ -26,8 +26,9 @@ class JourneyServiceSpec extends UnitSpec {
   implicit val hc = new HeaderCarrier()
 
   val testService = new PersistentJourneyService with TestStorage[(String, List[String])] {
-    override val journeyKey: String = "TestJourney"
-    override val model              = new TestJourneyModel
+    override val journeyKey: String                                       = "TestJourney"
+    override val model                                                    = new TestJourneyModel
+    override val breadcrumbsRetentionStrategy: Breadcrumbs => Breadcrumbs = _.take(9)
   }
 
   "PersistentJourneyService" should {

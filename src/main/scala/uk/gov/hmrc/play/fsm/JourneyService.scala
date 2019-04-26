@@ -27,7 +27,8 @@ trait JourneyService {
   val journeyKey: String
   val model: JourneyModel
 
-  type StateAndBreadcrumbs = (model.State, List[model.State])
+  type Breadcrumbs         = List[model.State]
+  type StateAndBreadcrumbs = (model.State, Breadcrumbs)
 
   /** Applies transition to the current state and returns new state or error */
   def apply(transition: model.Transition)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[StateAndBreadcrumbs]
@@ -39,9 +40,8 @@ trait JourneyService {
   def stepBack(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[StateAndBreadcrumbs]]
 
   /** Cleans breadcrumbs from the session and returns removed list */
-  def cleanBreadcrumbs(filter: List[model.State] => List[model.State])(
-    implicit hc: HeaderCarrier,
-    ec: ExecutionContext): Future[List[model.State]]
+  def cleanBreadcrumbs(
+    filter: Breadcrumbs => Breadcrumbs)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Breadcrumbs]
 }
 
 /**
@@ -61,10 +61,10 @@ trait PersistentJourneyService extends JourneyService {
   def clear(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Unit] = Future.successful(())
 
   /**
-    * Default retention strategy is to keep always last 9 states.
+    * Default retention strategy is to keep all visited states.
     * Override to provide your own strategy.
     */
-  val breadcrumbsRetentionStrategy: List[model.State] => List[model.State] = _.take(9)
+  val breadcrumbsRetentionStrategy: Breadcrumbs => Breadcrumbs = identity
 
   override def apply(
     transition: model.Transition)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[StateAndBreadcrumbs] =
@@ -97,9 +97,9 @@ trait PersistentJourneyService extends JourneyService {
         case None => Future.successful(None)
       }
 
-  override def cleanBreadcrumbs(filter: List[model.State] => List[model.State] = _ => Nil)(
+  override def cleanBreadcrumbs(filter: Breadcrumbs => Breadcrumbs = _ => Nil)(
     implicit hc: HeaderCarrier,
-    ec: ExecutionContext): Future[List[model.State]] =
+    ec: ExecutionContext): Future[Breadcrumbs] =
     for {
       stateAndBreadcrumbsOpt <- fetch
       breadcrumbs <- stateAndBreadcrumbsOpt match {
