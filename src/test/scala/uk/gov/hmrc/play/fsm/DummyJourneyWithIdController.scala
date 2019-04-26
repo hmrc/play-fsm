@@ -35,27 +35,27 @@ class DummyJourneyWithIdController @Inject()(override val journeyService: DummyJ
       .flatMap(_ => apply(journeyService.model.start, display))
   }
 
-  val showStart: Action[AnyContent] = showCurrentStateWhen {
+  val showStart: Action[AnyContent] = actionShowState {
     case State.Start =>
   }
 
   def continue: Action[AnyContent] = action { implicit request =>
-    authorisedWithForm(asUser)(ArgForm)(Transitions.continue)
+    whenAuthorisedWithForm(asUser)(ArgForm)(Transitions.continue)
   }
 
-  val showContinue: Action[AnyContent] = showCurrentStateWhenAuthorised(asUser) {
+  val showContinue: Action[AnyContent] = actionShowStateWhenAuthorised(asUser) {
     case State.Continue(_) =>
   }
 
   val stop: Action[AnyContent] = action { implicit request =>
-    authorised(asUser)(Transitions.stop)(redirect)
+    whenAuthorised(asUser)(Transitions.stop)(redirect)
   }
 
   val showStop: Action[AnyContent] = action { implicit request =>
-    whenAuthorised(asUser) {
+    showStateWhenAuthorised(asUser) {
       case State.Stop(_) =>
-    }(display).andThen {
-      case Success(_) => journeyService.clear
+    }.andThen {
+      case Success(_) => journeyService.cleanBreadcrumbs()
     }
   }
 

@@ -168,7 +168,7 @@ class DummyJourneyWithIdControllerSpec extends UnitSpec with OneAppPerSuite with
       journeyState.set(State.Stop("dummy"), List(State.Start))
       val result = controller.showStop(fakeRequest)
       status(result)   shouldBe 200
-      journeyState.get shouldBe None
+      journeyState.get should have[State](State.Stop("dummy"), Nil)
     }
 
   }

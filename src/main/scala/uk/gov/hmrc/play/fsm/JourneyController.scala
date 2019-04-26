@@ -10,20 +10,22 @@ import scala.concurrent.{ExecutionContext, Future}
 /**
   * Base controller for journeys based on Finite State Machine.
   *
-  * Provides 2 extension points:
+  * Provides 2 main extension points:
   *   - getCallFor: what is the endpoint representing given state
   *   - renderState: how to render given state
   *
-  * and few action creation helpers:
+  * and action creation helpers:
   *   - action
-  *   - authorised
-  *   - authorisedWithForm
-  *   - authorisedWithBootstrapAndForm
-  *   - authorisedShowCurrentStateWhen
-  *   - whenCurrentStateMatches
-  *   - showCurrentStateWhen
-  *   - whenAuthorisedAndCurrentStateMatches
-  *   - showCurrentStateWhenAuthorised
+  *   - actionShowState
+  *   - actionShowStateWhenAuthorised
+  *
+  * and async result functions:
+  *   - showState
+  *   - showStateWhenAuthorised
+  *   - whenAuthorised
+  *   - whenAuthorisedWithForm
+  *   - whenAuthorisedWithBootstrapAndForm
+  *   - bindForm
   */
 trait JourneyController extends HeaderCarrierProvider {
 
@@ -69,9 +71,11 @@ trait JourneyController extends HeaderCarrierProvider {
           routeFactory(origin, breadcrumbs)(request) // renders current state back
       }
 
+  /** gets call to the previous state */
   protected def backLinkFor(breadcrumbs: Breadcrumbs)(implicit request: Request[_]): Call =
     breadcrumbs.headOption.map(getCallFor).getOrElse(getCallFor(journeyService.model.root))
 
+  /** action for a given async result function */
   protected final def action(body: Request[_] => Future[Result])(implicit ec: ExecutionContext): Action[AnyContent] =
     Action.async { implicit request =>
       implicit val headerCarrier: HeaderCarrier = hc(request)
@@ -80,13 +84,15 @@ trait JourneyController extends HeaderCarrierProvider {
 
   type WithAuthorised[User] = Request[_] => (User => Future[Result]) => Future[Result]
 
-  protected final def authorised[User](withAuthorised: WithAuthorised[User])(transition: User => Transition)(
+  /** applies transition parametrized by an authorised user */
+  protected final def whenAuthorised[User](withAuthorised: WithAuthorised[User])(transition: User => Transition)(
     routeFactory: RouteFactory)(implicit hc: HeaderCarrier, request: Request[_], ec: ExecutionContext): Future[Result] =
     withAuthorised(request) { user: User =>
       apply(transition(user), routeFactory)
     }
 
-  protected final def authorisedWithForm[User, Payload](withAuthorised: WithAuthorised[User])(form: Form[Payload])(
+  /** applies transition parametrized by an authorised user and form output */
+  protected final def whenAuthorisedWithForm[User, Payload](withAuthorised: WithAuthorised[User])(form: Form[Payload])(
     transition: User => Payload => Transition)(
     implicit hc: HeaderCarrier,
     request: Request[_],
@@ -95,7 +101,10 @@ trait JourneyController extends HeaderCarrierProvider {
       bindForm(form, transition(user))
     }
 
-  protected final def authorisedWithBootstrapAndForm[User, Payload, T](bootstrap: Transition)(
+  /** applies 2 transitions in order:
+    * - first transition as provided
+    * - second transition parametrized by an authorised user and form output */
+  protected final def whenAuthorisedWithBootstrapAndForm[User, Payload, T](bootstrap: Transition)(
     withAuthorised: WithAuthorised[User])(form: Form[Payload])(transition: User => Payload => Transition)(
     implicit hc: HeaderCarrier,
     request: Request[_],
@@ -106,7 +115,9 @@ trait JourneyController extends HeaderCarrierProvider {
         .flatMap(_ => bindForm(form, transition(user)))
     }
 
-  private def bindForm[T](form: Form[T], transition: T => Transition)(
+  /** binds form and applies transition parametrized by its outcome if success,
+    * otherwise redirects to the current state with form errors in flash scope */
+  protected final def bindForm[T](form: Form[T], transition: T => Transition)(
     implicit hc: HeaderCarrier,
     request: Request[_],
     ec: ExecutionContext): Future[Result] =
@@ -121,6 +132,7 @@ trait JourneyController extends HeaderCarrierProvider {
                   .Redirect(getCallFor(state))
                   .flashing(Flash {
                     val data = formWithErrors.data
+                    // dummy parameter required if empty data
                     if (data.isEmpty) Map("dummy" -> "") else data
                   }))
             case None =>
@@ -131,50 +143,52 @@ trait JourneyController extends HeaderCarrierProvider {
 
   type ExpectedStates = PartialFunction[State, Unit]
 
-  protected final def showCurrentStateWhen(expectedStates: ExpectedStates)(
-    implicit ec: ExecutionContext): Action[AnyContent] =
-    whenCurrentStateMatches(expectedStates)(redirect)(ec)
-
-  protected final def whenCurrentStateMatches(expectedStates: ExpectedStates)(routeFactory: RouteFactory)(
+  /** action rendering current state or rewinding to the previous state matching expectation */
+  protected final def actionShowState(expectedStates: ExpectedStates)(
     implicit ec: ExecutionContext): Action[AnyContent] =
     action { implicit request =>
       implicit val headerCarrier: HeaderCarrier = hc(request)
-      when(expectedStates)(routeFactory)
+      showState(expectedStates)
     }
 
-  protected final def when(expectedStates: ExpectedStates)(
-    routeFactory: RouteFactory)(implicit hc: HeaderCarrier, request: Request[_], ec: ExecutionContext): Future[Result] =
+  /** renders current state or rewinds to the previous state matching expectation */
+  protected final def showState(expectedStates: ExpectedStates)(
+    implicit hc: HeaderCarrier,
+    request: Request[_],
+    ec: ExecutionContext): Future[Result] =
     for {
       stateAndBreadcrumbsOpt <- journeyService.currentState
       result <- stateAndBreadcrumbsOpt match {
-                 case None => apply(journeyService.model.start, routeFactory)
+                 case None => apply(journeyService.model.start, redirect)
                  case Some(stateAndBreadcrumbs) =>
-                   if (hasMatchingState(expectedStates, stateAndBreadcrumbs))
+                   if (hasState(expectedStates, stateAndBreadcrumbs))
                      journeyService.currentState
-                       .flatMap(stepBackUntil(expectedStates))
-                   else apply(journeyService.model.start, routeFactory)
+                       .flatMap(rewindTo(expectedStates))
+                   else apply(journeyService.model.start, redirect)
                }
     } yield result
 
-  protected final def showCurrentStateWhenAuthorised[User](withAuthorised: WithAuthorised[User])(
+  /** action rendering current state or rewinding to the previous state matching expectation */
+  protected final def actionShowStateWhenAuthorised[User](withAuthorised: WithAuthorised[User])(
     expectedStates: ExpectedStates)(implicit ec: ExecutionContext): Action[AnyContent] =
-    whenAuthorisedAndCurrentStateMatches(withAuthorised)(expectedStates)(redirect)(ec)
-
-  protected final def whenAuthorisedAndCurrentStateMatches[User](withAuthorised: WithAuthorised[User])(
-    expectedStates: ExpectedStates)(routeFactory: RouteFactory)(implicit ec: ExecutionContext): Action[AnyContent] =
     action { implicit request =>
       implicit val headerCarrier: HeaderCarrier = hc(request)
-      whenAuthorised(withAuthorised)(expectedStates)(routeFactory)
+      showStateWhenAuthorised(withAuthorised)(expectedStates)
     }
 
-  protected final def whenAuthorised[User](withAuthorised: WithAuthorised[User])(expectedStates: ExpectedStates)(
-    routeFactory: RouteFactory)(implicit hc: HeaderCarrier, request: Request[_], ec: ExecutionContext): Future[Result] =
+  /** when user authorized then render current state or rewinds to the previous state matching expectation */
+  protected final def showStateWhenAuthorised[User](withAuthorised: WithAuthorised[User])(
+    expectedStates: ExpectedStates)(
+    implicit hc: HeaderCarrier,
+    request: Request[_],
+    ec: ExecutionContext): Future[Result] =
     withAuthorised(request) { _ =>
-      when(expectedStates)(routeFactory)
+      showState(expectedStates)
     }
 
+  /** checks if some expected state can be found in journey history (breadcrumbs) */
   @tailrec
-  private def hasMatchingState(
+  protected final def hasState(
     filter: PartialFunction[State, Unit],
     stateAndBreadcrumbs: StateAndBreadcrumbs): Boolean =
     stateAndBreadcrumbs match {
@@ -183,18 +197,20 @@ trait JourneyController extends HeaderCarrierProvider {
         else
           breadcrumbs match {
             case Nil    => false
-            case s :: b => hasMatchingState(filter, (s, b))
+            case s :: b => hasState(filter, (s, b))
           }
     }
 
-  private def stepBackUntil(filter: PartialFunction[State, Unit])(stateAndBreadcrumbsOpt: Option[StateAndBreadcrumbs])(
+  /** rewinds journey state and history (breadcrumbs) back to the latest expected state */
+  protected final def rewindTo(expectedState: PartialFunction[State, Unit])(
+    stateAndBreadcrumbsOpt: Option[StateAndBreadcrumbs])(
     implicit hc: HeaderCarrier,
     request: Request[_],
     ec: ExecutionContext): Future[Result] = stateAndBreadcrumbsOpt match {
     case None => apply(journeyService.model.start, redirect)
     case Some((state, breadcrumbs)) =>
-      if (filter.isDefinedAt(state))
+      if (expectedState.isDefinedAt(state))
         Future.successful(renderState(state, breadcrumbs, None)(request))
-      else journeyService.stepBack.flatMap(stepBackUntil(filter))
+      else journeyService.stepBack.flatMap(rewindTo(expectedState))
   }
 }

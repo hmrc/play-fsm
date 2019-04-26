@@ -28,26 +28,26 @@ class DummyJourneyController @Inject()(override val journeyService: DummyJourney
   val start: Action[AnyContent] = action { implicit request =>
     journeyService
       .cleanBreadcrumbs(_ => Nil)
-      .flatMap(_ => apply(journeyService.model.start, display))
+      .flatMap(_ => apply(journeyService.model.start, redirect))
   }
 
-  val showStart: Action[AnyContent] = showCurrentStateWhen {
+  val showStart: Action[AnyContent] = actionShowState {
     case State.Start =>
   }
 
   def continue: Action[AnyContent] = action { implicit request =>
-    authorisedWithForm(asUser)(ArgForm)(Transitions.continue)
+    whenAuthorisedWithForm(asUser)(ArgForm)(Transitions.continue)
   }
 
-  val showContinue: Action[AnyContent] = showCurrentStateWhenAuthorised(asUser) {
+  val showContinue: Action[AnyContent] = actionShowStateWhenAuthorised(asUser) {
     case State.Continue(_) =>
   }
 
   val stop: Action[AnyContent] = action { implicit request =>
-    authorised(asUser)(Transitions.stop)(redirect)
+    whenAuthorised(asUser)(Transitions.stop)(redirect)
   }
 
-  val showStop: Action[AnyContent] = showCurrentStateWhenAuthorised(asUser) {
+  val showStop: Action[AnyContent] = actionShowStateWhenAuthorised(asUser) {
     case State.Stop(_) =>
   }
 

@@ -44,8 +44,9 @@ class DummyJourneyControllerSpec extends UnitSpec with OneAppPerSuite with State
     "after POST /start transition to Start" in {
       journeyState.clear
       val result = controller.start(fakeRequest)
-      status(result)   shouldBe 200
-      journeyState.get should have[State](State.Start, Nil)
+      status(result)           shouldBe 303
+      redirectLocation(result) shouldBe Some("/start")
+      journeyState.get         should have[State](State.Start, Nil)
     }
 
     "after GET /start transition to Start when uninitialized" in {

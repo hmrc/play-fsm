@@ -46,9 +46,9 @@ External async requests to the upstream services should be provided as a functio
 
 ## Benefits
 - proper concern separation: 
-    - *model* defines core business transaction logic decoupled from the application implementation intricacies,
-    - *controller* is responsible for wiring user interactions (HTTP requests and responses, HTML forms and pages) into the model,
-    - *service* acts as glue between controller and model, providing persistence and session management.
+    - *model* defines core and *pure* business logic decoupled from the application implementation details,
+    - *controller* is responsible for wiring user interactions (HTTP requests and responses, HTML forms and pages) into the model transitions,
+    - *service* acts as glue between controller and model, taking care of state persistence and breadcrumbs management.
 - lightweight, complete and fast testing of a core journey model without spanning a Play application or an HTTP server.
 
 ## How-tos
@@ -110,9 +110,9 @@ or
 
 ## Common patterns
 
-### State
+### State definition patterns
 
-- finite: sealed trait and a set of case classes/objects
+- finite state: sealed trait and a set of case classes/objects
 
 ```
     sealed trait State
@@ -124,48 +124,78 @@ or
     }
 ```
 
-- continuous: class or trait or a primitive value wrapper
+- continuous state: class or trait or a primitive value wrapper
 
 ```
     type State = String
 ```
 
-### Transition
+- distinguishing error states:
+
+```
+    sealed trait State
+    sealed trait IsError
+    
+    object State {
+        case object Start extends State
+        case class Continue(arg: String) extends State
+        case class Failed extends State with IsError
+    }
+```
+
+### Transition definition patterns
 
 - simple transition depending only on a current state
 
 ```
-val start = Transition {
-    case State.Start        => goto(State.Start)
-    case State.Continue(_)  => goto(State.Start)
-    case State.Stop(_)      => goto(State.Stop)
-}
+    val start = Transition {
+        case State.Start        => goto(State.Start)
+        case State.Continue(_)  => goto(State.Start)
+        case State.Stop(_)      => goto(State.Stop)
+    }
 ```
 
 - transition depending on a state and single parameter
 
 ```
-def stop(user: User) = Transition {
-    case Start              => goto(Stop(""))
-    case Continue(value)    => goto(Stop(value))
-}
+    def stop(user: User) = Transition {
+        case Start              => goto(Stop(""))
+        case Continue(value)    => goto(Stop(value))
+    }
 ```
 
 - transition depending on a state and multiple parameters
 
 ```
-def continue(user: User)(input: String) = Transition {
-    case Start              => goto(Continue(arg))
-    case Continue(value)    => goto(Continue(value + "," + input))
-}
+    def continue(user: User)(input: String) = Transition {
+        case Start              => goto(Continue(arg))
+        case Continue(value)    => goto(Continue(value + "," + input))
+    }
 ```
 
 - transition depending on a state, parameter and an async data source
 
 ```
-def continue(user: User)(externalCall: Int => Future[String]) = Transition {
-    case Start              => externalCall.map(input => goto(Continue(input)))
-    case Continue(value)    => externalCall.map(input => goto(Continue(value + "," + input)))
-}
+    def continue(user: User)(externalCall: Int => Future[String]) = Transition {
+        case Start              => externalCall.map(input => goto(Continue(input)))
+        case Continue(value)    => externalCall.map(input => goto(Continue(value + "," + input)))
+    }
 ```
 
+### Controller patterns
+
+- render current or previous state matching expectation:
+
+```
+    val showStart: Action[AnyContent] = actionShowState {
+        case State.Start =>
+      }
+```
+
+- make a state transition and redirect to the new state:
+
+```
+    val stop: Action[AnyContent] = action { implicit request =>
+        apply(Transitions.stop)(redirect)
+      }
+```
