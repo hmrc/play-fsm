@@ -16,6 +16,7 @@
 
 package uk.gov.hmrc.play.fsm
 
+import org.scalatest.concurrent.Eventually
 import org.scalatestplus.play.OneAppPerSuite
 import play.api.Application
 import play.api.inject.guice.GuiceApplicationBuilder
@@ -25,7 +26,11 @@ import play.api.test.Helpers.{redirectLocation, _}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class DummyJourneyWithIdControllerSpec extends UnitSpec with OneAppPerSuite with StateAndBreadcrumbsMatchers {
+class DummyJourneyWithIdControllerSpec
+    extends UnitSpec
+    with OneAppPerSuite
+    with StateAndBreadcrumbsMatchers
+    with Eventually {
 
   implicit val context: DummyContext = DummyContext()
 
@@ -165,8 +170,10 @@ class DummyJourneyWithIdControllerSpec extends UnitSpec with OneAppPerSuite with
     "after GET /stop show Stop when in Stop" in {
       journeyState.set(State.Stop("dummy"), List(State.Start))
       val result = controller.showStop(fakeRequest)
-      status(result)   shouldBe 200
-      journeyState.get should have[State](State.Stop("dummy"), Nil)
+      status(result) shouldBe 200
+      eventually {
+        journeyState.get should have[State](State.Stop("dummy"), Nil)
+      }
     }
 
   }
