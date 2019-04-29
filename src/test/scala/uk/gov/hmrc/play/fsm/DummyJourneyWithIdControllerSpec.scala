@@ -22,14 +22,12 @@ import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.mvc.Flash
 import play.api.test.FakeRequest
 import play.api.test.Helpers.{redirectLocation, _}
-import uk.gov.hmrc.http.HeaderCarrier
-import uk.gov.hmrc.play.test.UnitSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class DummyJourneyWithIdControllerSpec extends UnitSpec with OneAppPerSuite with StateAndBreadcrumbsMatchers {
 
-  implicit val hc: HeaderCarrier = HeaderCarrier()
+  implicit val context: DummyContext = DummyContext()
 
   override lazy val app: Application = new GuiceApplicationBuilder().build()
 

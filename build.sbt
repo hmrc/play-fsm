@@ -1,7 +1,6 @@
 import PlayCrossCompilation._
 import play.core.PlayVersion
 
-
 val libName = "play-fsm"
 
 lazy val scoverageSettings = {
@@ -35,14 +34,10 @@ lazy val library = Project(libName, file("."))
       ),
       play25 = Seq(
         "com.typesafe.play" %% "play-json"  % "2.5.19",
-        "uk.gov.hmrc" %% "http-verbs" % "9.3.0-play-25",
-        "uk.gov.hmrc" %% "hmrctest" % "3.6.0-play-25" % Test,
         "org.scalatestplus.play" %% "scalatestplus-play" % "2.0.1" % Test
       ),
       play26 = Seq(
         "com.typesafe.play" %% "play-json"  % "2.6.13",
-        "uk.gov.hmrc" %% "http-verbs" % "9.3.0-play-26",
-        "uk.gov.hmrc" %% "hmrctest" % "3.6.0-play-26" % Test,
         "org.scalatestplus.play" %% "scalatestplus-play" % "3.1.2" % Test
       )
     ),

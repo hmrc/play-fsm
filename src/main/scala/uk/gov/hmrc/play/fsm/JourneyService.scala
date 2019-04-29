@@ -16,13 +16,12 @@
 
 package uk.gov.hmrc.play.fsm
 
-import uk.gov.hmrc.http.HeaderCarrier
 import scala.concurrent.{ExecutionContext, Future}
 
 /**
   * JourneyService is an abstract base of components exposing journey to the application (controller)
   */
-trait JourneyService {
+trait JourneyService[RequestContext] {
 
   val journeyKey: String
   val model: JourneyModel
@@ -31,37 +30,38 @@ trait JourneyService {
   type StateAndBreadcrumbs = (model.State, Breadcrumbs)
 
   /** Applies transition to the current state and returns new state or error */
-  def apply(transition: model.Transition)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[StateAndBreadcrumbs]
+  def apply(
+    transition: model.Transition)(implicit rc: RequestContext, ec: ExecutionContext): Future[StateAndBreadcrumbs]
 
   /** Returns current state (if any) and breadcrumbs */
-  def currentState(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[StateAndBreadcrumbs]]
+  def currentState(implicit rc: RequestContext, ec: ExecutionContext): Future[Option[StateAndBreadcrumbs]]
 
   /** Returns initial state found in breadcrumbs or the root state if breadcrumbs are empty */
-  def initialState(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[model.State]
+  def initialState(implicit rc: RequestContext, ec: ExecutionContext): Future[model.State]
 
   /** Steps back to previous state and breadcrumbs (if any) */
-  def stepBack(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[StateAndBreadcrumbs]]
+  def stepBack(implicit rc: RequestContext, ec: ExecutionContext): Future[Option[StateAndBreadcrumbs]]
 
   /** Cleans breadcrumbs from the session and returns removed list */
   def cleanBreadcrumbs(
-    filter: Breadcrumbs => Breadcrumbs)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Breadcrumbs]
+    filter: Breadcrumbs => Breadcrumbs)(implicit rc: RequestContext, ec: ExecutionContext): Future[Breadcrumbs]
 }
 
 /**
   * This trait enhances JourneyService with StateAndBreadcrumbs persistence abstractions.
   */
-trait PersistentJourneyService extends JourneyService {
+trait PersistentJourneyService[RequestContext] extends JourneyService[RequestContext] {
 
-  protected def fetch(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[StateAndBreadcrumbs]]
+  protected def fetch(implicit rc: RequestContext, ec: ExecutionContext): Future[Option[StateAndBreadcrumbs]]
   protected def save(
-    state: StateAndBreadcrumbs)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[StateAndBreadcrumbs]
+    state: StateAndBreadcrumbs)(implicit rc: RequestContext, ec: ExecutionContext): Future[StateAndBreadcrumbs]
 
   /**
     * Should clear state and breadcrumbs. Default implementation does nothing.
     * Override to make the desired effect in your persistence layer of choice.
     * Put here to enable an interaction between controller and persistence layers.
     **/
-  def clear(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Unit] = Future.successful(())
+  def clear(implicit rc: RequestContext, ec: ExecutionContext): Future[Unit] = Future.successful(())
 
   /**
     * Default retention strategy is to keep all visited states.
@@ -70,7 +70,7 @@ trait PersistentJourneyService extends JourneyService {
   val breadcrumbsRetentionStrategy: Breadcrumbs => Breadcrumbs = identity
 
   override def apply(
-    transition: model.Transition)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[StateAndBreadcrumbs] =
+    transition: model.Transition)(implicit rc: RequestContext, ec: ExecutionContext): Future[StateAndBreadcrumbs] =
     for {
       initialStateAndBreadcrumbsOpt <- fetch
       endStateOrError <- {
@@ -86,10 +86,10 @@ trait PersistentJourneyService extends JourneyService {
       }
     } yield endStateOrError
 
-  override def currentState(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[StateAndBreadcrumbs]] =
+  override def currentState(implicit rc: RequestContext, ec: ExecutionContext): Future[Option[StateAndBreadcrumbs]] =
     fetch
 
-  override def initialState(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[model.State] =
+  override def initialState(implicit rc: RequestContext, ec: ExecutionContext): Future[model.State] =
     for {
       stateAndBreadcrumbsOpt <- fetch
       initialState <- Future.successful {
@@ -100,7 +100,7 @@ trait PersistentJourneyService extends JourneyService {
                      }
     } yield initialState
 
-  override def stepBack(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[StateAndBreadcrumbs]] =
+  override def stepBack(implicit rc: RequestContext, ec: ExecutionContext): Future[Option[StateAndBreadcrumbs]] =
     fetch
       .flatMap {
         case Some((_, breadcrumbs)) =>
@@ -112,7 +112,7 @@ trait PersistentJourneyService extends JourneyService {
       }
 
   override def cleanBreadcrumbs(filter: Breadcrumbs => Breadcrumbs = _ => Nil)(
-    implicit hc: HeaderCarrier,
+    implicit rc: RequestContext,
     ec: ExecutionContext): Future[Breadcrumbs] =
     for {
       stateAndBreadcrumbsOpt <- fetch

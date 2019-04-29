@@ -4,7 +4,6 @@ import javax.inject.{Inject, Singleton}
 import play.api.data.Form
 import play.api.mvc._
 import play.twirl.api.Html
-import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.fsm.OptionalFormOps._
 
 import scala.concurrent.ExecutionContext
@@ -14,14 +13,16 @@ import scala.util.Success
 class DummyJourneyWithIdController @Inject()(override val journeyService: DummyJourneyService)(
   implicit ec: ExecutionContext)
     extends Controller
-    with JourneyController
-    with JourneyIdSupport {
+    with JourneyController[DummyContext]
+    with JourneyIdSupport[DummyContext] {
 
   import DummyJourneyController._
   import journeyService.model.{State, Transitions}
 
-  override implicit def hc(implicit rh: RequestHeader): HeaderCarrier =
-    appendJourneyId(HeaderCarrier())
+  override def amendContext(rc: DummyContext)(key: String, value: String): DummyContext = rc
+
+  override implicit def context(implicit rh: RequestHeader): DummyContext =
+    appendJourneyId(DummyContext())
 
   val asUser: WithAuthorised[Int] = { implicit request => body =>
     body(5)

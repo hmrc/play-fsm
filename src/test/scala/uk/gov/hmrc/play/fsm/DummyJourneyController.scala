@@ -4,7 +4,6 @@ import play.api.data.Form
 import play.api.data.Forms.{single, text}
 import play.api.mvc._
 import play.twirl.api.Html
-import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.fsm.OptionalFormOps._
 
 import scala.concurrent.ExecutionContext
@@ -12,12 +11,12 @@ import scala.concurrent.ExecutionContext
 @Singleton
 class DummyJourneyController @Inject()(override val journeyService: DummyJourneyService)(implicit ec: ExecutionContext)
     extends Controller
-    with JourneyController {
+    with JourneyController[DummyContext] {
 
   import DummyJourneyController._
   import journeyService.model.{State, Transitions}
 
-  override implicit def hc(implicit rh: RequestHeader): HeaderCarrier = HeaderCarrier()
+  override implicit def context(implicit rh: RequestHeader): DummyContext = DummyContext()
 
   val asUser: WithAuthorised[Int] = { implicit request => body =>
     body(5)

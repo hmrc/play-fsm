@@ -16,10 +16,8 @@
 
 package uk.gov.hmrc.play.fsm
 
-import play.api.libs.json.{Format, JsArray, Json}
-import uk.gov.hmrc.play.test.UnitSpec
-
-import DummyJourneyModel.State
+import play.api.libs.json.{Format, Json}
+import uk.gov.hmrc.play.fsm.DummyJourneyModel.State
 
 class DummyJourneyStateFormatsSpec extends UnitSpec {
 

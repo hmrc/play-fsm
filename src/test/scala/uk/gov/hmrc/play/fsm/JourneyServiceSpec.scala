@@ -16,16 +16,13 @@
 
 package uk.gov.hmrc.play.fsm
 
-import uk.gov.hmrc.http.HeaderCarrier
-import uk.gov.hmrc.play.test.UnitSpec
-
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class JourneyServiceSpec extends UnitSpec {
 
-  implicit val hc = new HeaderCarrier()
+  implicit val context = DummyContext()
 
-  val testService = new PersistentJourneyService with TestStorage[(String, List[String])] {
+  val testService = new PersistentJourneyService[DummyContext] with TestStorage[(String, List[String])] {
     override val journeyKey: String                                       = "TestJourney"
     override val model                                                    = new TestJourneyModel
     override val breadcrumbsRetentionStrategy: Breadcrumbs => Breadcrumbs = _.take(9)

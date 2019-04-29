@@ -1,13 +1,11 @@
 package uk.gov.hmrc.play.fsm
-import uk.gov.hmrc.play.test.UnitSpec
 import DummyJourneyModel.{State, Transition, TransitionNotAllowed, Transitions}
-import uk.gov.hmrc.http.HeaderCarrier
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class DummyJourneyModelSpec extends UnitSpec with StateMatchers[State] {
 
-  implicit val hc: HeaderCarrier = HeaderCarrier()
+  implicit val context: DummyContext = DummyContext()
 
   case class given(initialState: State) extends DummyJourneyService {
     Option(initialState) match {

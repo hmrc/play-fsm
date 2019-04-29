@@ -16,8 +16,6 @@
 
 package uk.gov.hmrc.play.fsm
 
-import uk.gov.hmrc.http.HeaderCarrier
-
 import scala.concurrent.{ExecutionContext, Future}
 
 trait TestStorage[S] {
@@ -25,8 +23,8 @@ trait TestStorage[S] {
   @volatile
   private var state: Option[S] = None
 
-  def fetch(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[S]] = Future.successful(state)
-  def save(newState: S)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[S] = Future {
+  def fetch(implicit hc: DummyContext, ec: ExecutionContext): Future[Option[S]] = Future.successful(state)
+  def save(newState: S)(implicit hc: DummyContext, ec: ExecutionContext): Future[S] = Future {
     state = Some(newState); newState
   }
 

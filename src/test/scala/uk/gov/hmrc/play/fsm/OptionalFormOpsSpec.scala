@@ -4,7 +4,6 @@ import play.api.data.Form
 import play.api.data.Forms.{number, single}
 import play.api.mvc.{AnyContent, Request}
 import play.api.test.FakeRequest
-import uk.gov.hmrc.play.test.UnitSpec
 
 class OptionalFormOpsSpec extends UnitSpec {
 
