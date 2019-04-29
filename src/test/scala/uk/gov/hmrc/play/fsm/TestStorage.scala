@@ -16,18 +16,24 @@
 
 package uk.gov.hmrc.play.fsm
 
+import java.util.concurrent.atomic.AtomicReference
+import java.util.function.UnaryOperator
+
 import scala.concurrent.{ExecutionContext, Future}
 
 trait TestStorage[S] {
 
-  @volatile
-  private var state: Option[S] = None
+  private val state: AtomicReference[Option[S]] = new AtomicReference(None)
 
-  def fetch(implicit hc: DummyContext, ec: ExecutionContext): Future[Option[S]] = Future.successful(state)
+  def fetch(implicit hc: DummyContext, ec: ExecutionContext): Future[Option[S]] = Future.successful(state.get())
   def save(newState: S)(implicit hc: DummyContext, ec: ExecutionContext): Future[S] = Future {
-    state = Some(newState); newState
+    state
+      .updateAndGet(new UnaryOperator[Option[S]] {
+        override def apply(t: Option[S]): Option[S] = Some(newState)
+      })
+      .get
   }
 
   def clear(): Unit =
-    state = None
+    state.set(None)
 }
