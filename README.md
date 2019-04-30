@@ -46,6 +46,15 @@ State is not expected to have finite values, can be continuous if needed!
 Transition should be a *pure* function, depending only on its own parameters and state. 
 External async requests to the upstream services should be provided as a function-type parameters. 
 
+## RequestContext type parameter
+The type parameter `[RequestContext]` is the type of an implicit context information expected to be
+available throughout every action body and in the bottom layers (i.e. persistence, connectors). 
+In the HMRC case it is a `HeaderCarrier`.
+
+Inside your `XYZController extends JourneyController[MyContext]` implement:
+
+    override implicit def context(implicit rh: RequestHeader): MyContext = MyContext(...)
+
 ## Benefits
 - proper concern separation: 
     - *model* defines core and *pure* business logic decoupled from the application implementation details,
@@ -123,6 +132,7 @@ or
         case object Start extends State
         case class Continue(arg: String) extends State
         case class Stop(result: String) extends State
+        case object TheEnd
     }
 ```
 
@@ -132,15 +142,14 @@ or
     type State = String
 ```
 
-- distinguishing error states:
+- marking error states
 
 ```
     sealed trait State
     sealed trait IsError
     
     object State {
-        case object Start extends State
-        case class Continue(arg: String) extends State
+        ...
         case class Failed extends State with IsError
     }
 ```
@@ -186,7 +195,7 @@ or
 
 ### Controller patterns
 
-- render current or previous state matching expectation:
+- render current or previous state matching expectation
 
 ```
     val showStart: Action[AnyContent] = actionShowState {
@@ -194,10 +203,48 @@ or
       }
 ```
 
-- make a state transition and redirect to the new state:
+- make a state transition and redirect to the new state
 
 ```
     val stop: Action[AnyContent] = action { implicit request =>
         apply(Transitions.stop)(redirect)
       }
 ```
+
+- clear or refine journey history after transition (cleanBreadcrumbs)
+
+```
+    def showTheEndState = action { implicit request =>
+        showStateWhenAuthorised(AsUser) {
+          case _: State.TheEnd =>
+        }.andThen {
+          // clears journey history
+          case Success(_) => journeyService.cleanBreadcrumbs()
+        }
+      }
+```
+
+- to enforce unique journeyId in the session mixin `JourneyIdSupport`
+
+```
+    ... extends Controller
+            with JourneyController[MyContext]
+            with JourneyIdSupport[MyContext] {
+```
+
+### Service patterns
+
+- do not keep error states in the journey history (breadcrumbs)
+
+```
+    override val breadcrumbsRetentionStrategy: Breadcrumbs => Breadcrumbs =
+        _.filterNot(s => s.isInstanceOf[model.IsError])
+```
+
+- keep only previous step
+
+```
+    override val breadcrumbsRetentionStrategy: Breadcrumbs => Breadcrumbs =
+        _.take(1)
+```
+
