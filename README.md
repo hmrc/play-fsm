@@ -50,7 +50,7 @@ Journey is build out of **State**s and **Transition**s.
 State is not expected to have finite values, can be continuous if needed!
 
 **Transition** is a means of moving from one state to another. It's type is a partial async function `State => Future[State]`. 
-Transition should be a *pure* function, depending only on its own parameters and current state. 
+Transition should be a *pure* function, depending only on its own parameters and the current state. 
 External async requests to the upstream services should be provided as a function-type parameters. 
 
 **Breadcrumbs** is a reversed list of previous states (the head is the last one) forming journey history.
