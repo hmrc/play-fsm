@@ -3,15 +3,20 @@ This library provides State Machine building blocks for a stateful Play applicat
 
 [ ![Download](https://api.bintray.com/packages/hmrc/releases/play-fsm/images/download.svg) ](https://bintray.com/hmrc/releases/play-fsm/_latestVersion)
 
-## Features
-- `JourneyModel` state and transition model
-- `JourneyService` basic state and breadcrumbs services
-- `PersistentJourneyService` persistence plug-in
-- `JourneyController` base controller trait with common action builders
-- `JsonStateFormats` state to json serialization and deserialization builder
-- `JourneyIdSupport` mix into JourneyController to feature unique journeyId in the Play session
+## Table of contents
+
+* [About](#about)
+    * [Advanced examples](#advanced-examples)
+* [How-tos](#how-tos)
+* [Patterns](#patterns)
+    * [Model](#model-patterns)
+    * [Controller](#controller-patterns)
+    * [Service](#service-patterns)
+    * [Authorization](#authorization-patterns)
+
+## About
     
-## Motivation
+### Motivation
 Managing adequately complex stateful user journey leading to the business transaction in an application is a challenge. 
 It is even more of a challenge in a traditional server-oriented web application built on top of a stateless-by-design HTTP protocol.
 
@@ -24,13 +29,13 @@ Common requirements are:
 - out-of-order and rogue request handling, introducing malformed state leading to invalid business transaction has to be prevented
 - the testability of an application must not be compromised by the intrinsic implementation complexities
 
-## Solution
+### Solution
 State Machine is an established pattern to manage complex internal state flow based on a set of transition rules. 
 See <https://brilliant.org/wiki/finite-state-machines/>.
 
 In this library, you find a ready-to-use solution tailored for use in an HMRC-style frontend Play application, like `agent-invitations-frontend`. 
 
-## Design
+### Design
 The key concept is a *Journey*. 
 Each journey represents separate business transaction. 
 It is only loosely related to the HTTP and user session, in fact, depending on the state persistence
@@ -46,12 +51,38 @@ State is not expected to have finite values, can be continuous if needed!
 Transition should be a *pure* function, depending only on its own parameters and state. 
 External async requests to the upstream services should be provided as a function-type parameters. 
 
-## Benefits
+### Benefits
 - proper concern separation: 
     - *model* defines core and *pure* business logic decoupled from the application implementation details,
     - *controller* is responsible for wiring user interactions (HTTP requests and responses, HTML forms and pages) into the model transitions,
     - *service* acts as glue between controller and model, taking care of state persistence and breadcrumbs management.
 - lightweight, complete and fast testing of a core journey model without spanning a Play application or an HTTP server.
+
+### Features
+- `JourneyModel` state and transition model
+- `JourneyService` basic state and breadcrumbs services
+- `PersistentJourneyService` persistence plug-in
+- `JourneyController` base controller trait with common action builders
+- `JsonStateFormats` state to json serialization and deserialization builder
+- `JourneyIdSupport` mix into JourneyController to feature unique journeyId in the Play session
+
+### Advanced examples:
+- Agent Invitations: 
+    - Models: <https://github.com/hmrc/agent-invitations-frontend/tree/master/app/uk/gov/hmrc/agentinvitationsfrontend/journeys>
+    - Controllers: <https://github.com/hmrc/agent-invitations-frontend/blob/master/app/uk/gov/hmrc/agentinvitationsfrontend/controllers/>
+- Agent-Client relationships management help-desk: 
+    - Models: <https://github.com/hmrc/agent-client-management-helpdesk-frontend/blob/master/app/uk/gov/hmrc/agentclientmanagementhelpdeskfrontend/journeys/>
+    - Controllers: <https://github.com/hmrc/agent-client-management-helpdesk-frontend/blob/master/app/uk/gov/hmrc/agentclientmanagementhelpdeskfrontend/controllers/>
+
+### Best practices
+- Keep a single model definition in a single file.
+- Name states as nouns and transitions as verbs.
+- Carefully balance when to introduce new state and when to add properties to the existing one(s).
+- Use a rule of thumb to keep only relevant data in the state.
+- Try to avoid optional properties; their presence usually suggest splitting the state.
+- Do NOT put functions and framework components in a state; a state should be immutable and serializable.
+- Define transitions using curried methods. It works well with action builders.
+- When the transition depends on some external operation(s), pass it as a function(s).
 
 ## How-tos
 
@@ -101,27 +132,11 @@ Inside your `XYZController extends JourneyController[MyContext]` implement:
 
     override implicit def context(implicit rh: RequestHeader): MyContext = MyContext(...)
 
-## Advanced examples:
-- Agent Invitations: 
-    - Models: <https://github.com/hmrc/agent-invitations-frontend/tree/master/app/uk/gov/hmrc/agentinvitationsfrontend/journeys>
-    - Controllers: <https://github.com/hmrc/agent-invitations-frontend/blob/master/app/uk/gov/hmrc/agentinvitationsfrontend/controllers/>
-- Agent-Client relationships management help-desk: 
-    - Models: <https://github.com/hmrc/agent-client-management-helpdesk-frontend/blob/master/app/uk/gov/hmrc/agentclientmanagementhelpdeskfrontend/journeys/>
-    - Controllers: <https://github.com/hmrc/agent-client-management-helpdesk-frontend/blob/master/app/uk/gov/hmrc/agentclientmanagementhelpdeskfrontend/controllers/>
+## Patterns
 
-## Best practices
-- Keep a single model definition in a single file.
-- Name states as nouns and transitions as verbs.
-- Carefully balance when to introduce new state and when to add properties to the existing one(s).
-- Use a rule of thumb to keep only relevant data in the state.
-- Try to avoid optional properties; their presence usually suggest splitting the state.
-- Do NOT put functions and framework components in a state; a state should be immutable and serializable.
-- Define transitions using curried methods. It works well with action builders.
-- When the transition depends on some external operation(s), pass it as a function(s).
+### Model patterns
 
-## Common patterns
-
-### State definition patterns
+#### State definition patterns
 
 - finite state: sealed trait and a set of case classes/objects
 
@@ -154,7 +169,7 @@ Inside your `XYZController extends JourneyController[MyContext]` implement:
     }
 ```
 
-### Transition definition patterns
+#### Transition definition patterns
 
 - simple transition depending only on a current state
 
@@ -232,6 +247,8 @@ Inside your `XYZController extends JourneyController[MyContext]` implement:
             with JourneyIdSupport[MyContext] {
 ```
 
+- authorisation
+
 ### Service patterns
 
 - do not keep error states in the journey history (breadcrumbs)
@@ -246,5 +263,34 @@ Inside your `XYZController extends JourneyController[MyContext]` implement:
 ```
     override val breadcrumbsRetentionStrategy: Breadcrumbs => Breadcrumbs =
         _.take(1)
+```
+
+### Authorization patterns
+
+- wrap your own authorisation logic returning some `User` entity
+
+```
+    val asUser: WithAuthorised[User] = { implicit request => body =>
+        myAuthFunction(request) match {
+            case None       => Future.failed(...)
+            case Some(user) => body(user)
+        }
+      }
+```
+
+- transition only when user has been authorized
+
+```
+    val stop: Action[AnyContent] = action { implicit request =>
+        whenAuthorised(asUser)(Transitions.stop)(redirect)
+      }
+```
+
+- display page for an authorized user only
+
+```
+    val showContinue: Action[AnyContent] = actionShowStateWhenAuthorised(asUser) {
+        case State.Continue(_) =>
+      }
 ```
 
