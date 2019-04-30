@@ -46,15 +46,6 @@ State is not expected to have finite values, can be continuous if needed!
 Transition should be a *pure* function, depending only on its own parameters and state. 
 External async requests to the upstream services should be provided as a function-type parameters. 
 
-## RequestContext type parameter
-The type parameter `[RequestContext]` is the type of an implicit context information expected to be
-available throughout every action body and in the bottom layers (i.e. persistence, connectors). 
-In the HMRC case it is a `HeaderCarrier`.
-
-Inside your `XYZController extends JourneyController[MyContext]` implement:
-
-    override implicit def context(implicit rh: RequestHeader): MyContext = MyContext(...)
-
 ## Benefits
 - proper concern separation: 
     - *model* defines core and *pure* business logic decoupled from the application implementation details,
@@ -100,6 +91,15 @@ or
 - Use `backlinkFor` method to get back link call given breadcrumbs
 - GET actions should be idempotent, i.e. should only render existing or historical state.
 - POST actions should always invoke some state transition and be followed be a redirect.
+
+### What is RequestContext type parameter?
+The type parameter `[RequestContext]` is the type of an implicit context information expected to be
+available throughout every action body and in the bottom layers (i.e. persistence, connectors). 
+In the HMRC case it is a `HeaderCarrier`.
+
+Inside your `XYZController extends JourneyController[MyContext]` implement:
+
+    override implicit def context(implicit rh: RequestHeader): MyContext = MyContext(...)
 
 ## Advanced examples:
 - Agent Invitations: 
