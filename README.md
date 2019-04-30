@@ -1,6 +1,8 @@
 # play-fsm
 This library provides State Machine building blocks for a stateful Play application.
 
+[ ![Download](https://api.bintray.com/packages/hmrc/releases/play-fsm/images/download.svg) ](https://bintray.com/hmrc/releases/play-fsm/_latestVersion)
+
 ## Features
 - `JourneyModel` state and transition model
 - `JourneyService` basic state and breadcrumbs services
