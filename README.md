@@ -36,20 +36,27 @@ See <https://brilliant.org/wiki/finite-state-machines/>.
 In this library, you find a ready-to-use solution tailored for use in an HMRC-style frontend Play application, like `agent-invitations-frontend`. 
 
 ### Design
-The key concept is a *Journey*. 
-Each journey represents separate business transaction. 
-It is only loosely related to the HTTP and user session, in fact, depending on the state persistence
-implementation it can be a part of a user session or even it could span multiple users. 
-Former is the common variant. It is expected of an application to have one or more journeys. 
+The key concept is a **Journey**.
+Each journey represents separate business transaction.
+Each journey has a single root state.
 
-Journey consist of a set of *State*s and *Transition*s. 
+Journey is only loosely related to the HTTP and user session, in fact, depending on the state persistence
+implementation it can be a part of a user session, span multiple sessions or cross authorisation boundary. 
+It is expected of an application to consist of one or more journeys. 
 
-*State* can be anything but usually it will be a set of case classes/objects representing the stage and data of a business transaction. 
+Journey is build out of **State**s and **Transition**s. 
+
+**State** can be anything but usually it will be a set of case classes/objects representing the stage and data of a business transaction. 
 State is not expected to have finite values, can be continuous if needed!
 
-*Transition* is a means of moving from one state to another. It is represented as a partial async function. 
-Transition should be a *pure* function, depending only on its own parameters and state. 
+**Transition** is a means of moving from one state to another. It's type is a partial async function `State => Future[State]`. 
+Transition should be a *pure* function, depending only on its own parameters and current state. 
 External async requests to the upstream services should be provided as a function-type parameters. 
+
+**Breadcrumbs** is a reversed list of previous states (the head is the last one) forming journey history.
+History is available only to the *service* and *controller* layers, *model* by design has no implicit knowledge of the history.
+Breadcrumbs allow for safe backlinking and rewinding.
+If needed *controller* and *service* can exercise fine control over the journey history.
 
 ### Benefits
 - proper concern separation: 
