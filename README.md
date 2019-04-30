@@ -17,7 +17,7 @@ This library provides State Machine building blocks for a stateful Play applicat
 ## About
     
 ### Motivation
-Managing adequately complex stateful user journey leading to the business transaction in an application is a challenge. 
+Managing adequately stateful user journey through the complex business transaction is a challenge. 
 It is even more of a challenge in a traditional server-oriented web application built on top of a stateless-by-design HTTP protocol.
 
 Common requirements are:
