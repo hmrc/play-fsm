@@ -46,10 +46,13 @@ class DummyJourneyWithIdControllerSpec
   "DummyJourneyWithIdController" should {
     "after POST /start without journeyId redirect" in {
       journeyState.clear
-      val result = controller.start(FakeRequest())
-      status(result)                                            shouldBe 303
-      redirectLocation(result)                                  shouldBe Some("/start")
+      val request = FakeRequest().withSession("existingKey" -> "existingValue")
+      val result  = controller.start(request)
+      status(result)           shouldBe 303
+      redirectLocation(result) shouldBe Some("/start")
+
       session(result).get(controller.journeyService.journeyKey) shouldBe defined
+      session(result).get("existingKey")                        shouldBe Some("existingValue")
     }
 
     "after POST /start with journeyId transition to Start" in {
