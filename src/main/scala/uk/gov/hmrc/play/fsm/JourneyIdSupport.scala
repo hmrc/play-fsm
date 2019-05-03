@@ -16,8 +16,10 @@ trait JourneyIdSupport[RequestContext] {
   def appendJourneyId(rc: RequestContext)(implicit rh: RequestHeader): RequestContext =
     journeyId.map(value => amendContext(rc)(journeyService.journeyKey, value)).getOrElse(rc)
 
-  def appendJourneyId(result: Result)(implicit rh: RequestHeader): Result =
-    result.withSession(journeyService.journeyKey -> journeyId(rh).getOrElse(UUID.randomUUID().toString))
+  def appendJourneyId(result: Result)(implicit rh: RequestHeader): Result = {
+    val journeyKeyValue = journeyService.journeyKey -> journeyId(rh).getOrElse(UUID.randomUUID().toString)
+    result.withSession(result.session + journeyKeyValue)
+  }
 
   override def withValidRequest(
     body: => Future[Result])(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
