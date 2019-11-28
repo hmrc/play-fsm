@@ -12,11 +12,13 @@ addSbtPlugin("org.scoverage" % "sbt-scoverage" % "1.5.0")
 
 addSbtPlugin("com.lucidchart" % "sbt-scalafmt" % "1.16")
 
-addSbtPlugin("uk.gov.hmrc" % "sbt-play-cross-compilation" % "0.15.0")
+addSbtPlugin("uk.gov.hmrc" % "sbt-play-cross-compilation" % "0.18.0")
 
 val playPlugin =
-  if (sys.env.get("PLAY_VERSION").exists(_ == "2.6"))
-    "com.typesafe.play" % "sbt-plugin" % "2.6.20"
+  if (sys.env.get("PLAY_VERSION").exists(_ == "2.7"))
+    "com.typesafe.play" % "sbt-plugin" % "2.7.3"
+  else if (sys.env.get("PLAY_VERSION").exists(_ == "2.6"))
+    "com.typesafe.play" % "sbt-plugin" % "2.6.24"
   else
     "com.typesafe.play" % "sbt-plugin" % "2.5.19"
 
