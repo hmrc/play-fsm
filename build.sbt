@@ -6,7 +6,7 @@ val libName = "play-fsm"
 lazy val scoverageSettings = {
   import scoverage.ScoverageKeys
   Seq(
-    // Semicolon-separated list of regexs matching classes to exclude
+    // Semicolon-separated list of regex matching classes to exclude
     ScoverageKeys.coverageExcludedPackages := """uk\.gov\.hmrc\.BuildInfo;.*\.Routes;.*\.RoutesPrefix;.*Filters?;Module;GraphiteStartUp;.*\.Reverse[^.]*""",
     ScoverageKeys.coverageMinimum := 80.00,
     ScoverageKeys.coverageFailOnMinimum := false,
@@ -50,6 +50,7 @@ lazy val library = Project(libName, file("."))
       Resolver.bintrayRepo("hmrc", "releases"),
       "typesafe-releases" at "http://repo.typesafe.com/typesafe/releases/"
     ),
+    dependencyOverrides +=  "com.typesafe.play" %% "twirl-api" % "1.4.2",
     playCrossCompilationSettings,
     scalafmtOnCompile in Compile := true,
     scalafmtOnCompile in Test := true,
