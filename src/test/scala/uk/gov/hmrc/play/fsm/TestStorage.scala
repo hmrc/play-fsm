@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 HM Revenue & Customs
+ * Copyright 2020 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,8 @@ trait TestStorage[S] {
 
   private val state: AtomicReference[Option[S]] = new AtomicReference(None)
 
-  def fetch(implicit hc: DummyContext, ec: ExecutionContext): Future[Option[S]] = Future.successful(state.get())
+  def fetch(implicit hc: DummyContext, ec: ExecutionContext): Future[Option[S]] =
+    Future.successful(state.get())
   def save(newState: S)(implicit hc: DummyContext, ec: ExecutionContext): Future[S] = Future {
     state
       .updateAndGet(new UnaryOperator[Option[S]] {

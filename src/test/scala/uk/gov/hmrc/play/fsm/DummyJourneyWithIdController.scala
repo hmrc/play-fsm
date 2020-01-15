@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 HM Revenue & Customs
+ * Copyright 2020 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -79,11 +79,12 @@ class DummyJourneyWithIdController @Inject()(override val journeyService: DummyJ
   // VIEWS
 
   /** implement this to map states into endpoints for redirection and back linking */
-  override def getCallFor(state: journeyService.model.State)(implicit request: Request[_]): Call = state match {
-    case State.Start       => Call("GET", "/start")
-    case State.Continue(_) => Call("GET", "/continue")
-    case State.Stop(_)     => Call("GET", "/stop")
-  }
+  override def getCallFor(state: journeyService.model.State)(implicit request: Request[_]): Call =
+    state match {
+      case State.Start       => Call("GET", "/start")
+      case State.Continue(_) => Call("GET", "/continue")
+      case State.Stop(_)     => Call("GET", "/stop")
+    }
 
   /** implement this to render state after transition or when form validation fails */
   override def renderState(
@@ -91,7 +92,8 @@ class DummyJourneyWithIdController @Inject()(override val journeyService: DummyJ
     breadcrumbs: List[journeyService.model.State],
     formWithErrors: Option[Form[_]])(implicit request: Request[_]): Result =
     state match {
-      case State.Start         => Ok(Html(s"""Start | <a href="${backLinkFor(breadcrumbs).url}">back</a>"""))
+      case State.Start =>
+        Ok(Html(s"""Start | <a href="${backLinkFor(breadcrumbs).url}">back</a>"""))
       case State.Continue(arg) => Ok(s"Continue with $arg and form ${formWithErrors.or(ArgForm)}")
       case State.Stop(result)  => Ok(s"Result is $result")
     }

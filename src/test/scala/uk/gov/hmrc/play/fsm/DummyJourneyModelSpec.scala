@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 HM Revenue & Customs
+ * Copyright 2020 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -68,13 +68,15 @@ class DummyJourneyModelSpec extends UnitSpec with StateMatchers[State] {
 
     "in a Continue state" should {
       "return to the Start state after `start` transition if Start is in breadcrumbs" in {
-        given(State.Continue("dummy")).withBreadcrumbs(State.Start) when Transitions.start should thenGo(State.Start)
+        given(State.Continue("dummy"))
+          .withBreadcrumbs(State.Start) when Transitions.start should thenGo(State.Start)
       }
       "return to the Start state after `start` transition if Start not in breadcrumbs" in {
         given(State.Continue("dummy")) when Transitions.start should thenGo(State.Start)
       }
       "go to the Continue state after `continue` transition" in {
-        given(State.Continue("dummy")) when Transitions.continue(5)("foo") should thenGo(State.Continue("dummy,foo"))
+        given(State.Continue("dummy")) when Transitions.continue(5)("foo") should thenGo(
+          State.Continue("dummy,foo"))
       }
       "go to the Continue state after `stop` transition" in {
         given(State.Continue("dummy")) when Transitions.stop(5) should thenGo(State.Stop("dummy"))
@@ -84,14 +86,17 @@ class DummyJourneyModelSpec extends UnitSpec with StateMatchers[State] {
     "in a Stop state" should {
       "return to the Start state after `start` transition if Start is in breadcrumbs" in {
         given(State.Stop("foo"))
-          .withBreadcrumbs(State.Continue("dummy"), State.Start) when Transitions.start should thenGo(State.Start)
+          .withBreadcrumbs(State.Continue("dummy"), State.Start) when Transitions.start should thenGo(
+          State.Start)
       }
       "return to the Start state after `start` transition if Start not in breadcrumbs" in {
-        given(State.Stop("foo")).withBreadcrumbs(State.Continue("dummy")) when Transitions.start should thenGo(
+        given(State.Stop("foo"))
+          .withBreadcrumbs(State.Continue("dummy")) when Transitions.start should thenGo(
           State.Start)
       }
       "stay in the Stop state after `continue` transition" in {
-        given(State.Stop("foo")) when Transitions.continue(5)("dummy") should thenGo(State.Stop("foo"))
+        given(State.Stop("foo")) when Transitions.continue(5)("dummy") should thenGo(
+          State.Stop("foo"))
       }
       "throw Exception after `stop` transition" in {
         given(State.Stop("foo")) when Transitions.stop(5) should thenGo(State.Stop("foo"))

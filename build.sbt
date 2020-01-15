@@ -29,7 +29,7 @@ lazy val library = Project(libName, file("."))
       shared = Seq(
         "org.scalatest"     %% "scalatest"  % "3.0.8"  % Test,
         "org.pegdown"       %  "pegdown"    % "1.6.0"  % Test,
-        "org.scalacheck"    %% "scalacheck" % "1.14.2" % Test,
+        "org.scalacheck"    %% "scalacheck" % "1.14.3" % Test,
         "com.typesafe.play" %% "play-test" % PlayVersion.current % Test
       ),
       play25 = Seq(

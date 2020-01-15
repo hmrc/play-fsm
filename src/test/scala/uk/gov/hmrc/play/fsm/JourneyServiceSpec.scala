@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 HM Revenue & Customs
+ * Copyright 2020 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,8 @@ class JourneyServiceSpec extends UnitSpec {
 
   implicit val context = DummyContext()
 
-  val testService = new PersistentJourneyService[DummyContext] with TestStorage[(String, List[String])] {
+  val testService = new PersistentJourneyService[DummyContext]
+  with TestStorage[(String, List[String])] {
     override val journeyKey: String                                       = "TestJourney"
     override val model                                                    = new TestJourneyModel
     override val breadcrumbsRetentionStrategy: Breadcrumbs => Breadcrumbs = _.take(9)
@@ -38,7 +39,8 @@ class JourneyServiceSpec extends UnitSpec {
       await(testService.apply(testService.model.Transitions.append("bar")))
       await(testService.fetch) shouldBe Some(("raboofbar", List("raboof", "foobar", "foo")))
       await(testService.apply(testService.model.Transitions.reverse))
-      await(testService.fetch) shouldBe Some(("rabfoobar", List("raboofbar", "raboof", "foobar", "foo")))
+      await(testService.fetch) shouldBe Some(
+        ("rabfoobar", List("raboofbar", "raboof", "foobar", "foo")))
       await(testService.apply(testService.model.Transitions.append("foo")))
       await(testService.fetch) shouldBe Some(
         ("rabfoobarfoo", List("rabfoobar", "raboofbar", "raboof", "foobar", "foo")))
@@ -46,13 +48,22 @@ class JourneyServiceSpec extends UnitSpec {
       await(testService.fetch) shouldBe Some(
         ("oofraboofbar", List("rabfoobarfoo", "rabfoobar", "raboofbar", "raboof", "foobar", "foo")))
       await(testService.apply(testService.model.Transitions.replace("o", "x")))
-      await(testService.fetch) shouldBe Some(
-        ("xxfrabxxfbar", List("oofraboofbar", "rabfoobarfoo", "rabfoobar", "raboofbar", "raboof", "foobar", "foo")))
+      await(testService.fetch) shouldBe Some((
+        "xxfrabxxfbar",
+        List("oofraboofbar", "rabfoobarfoo", "rabfoobar", "raboofbar", "raboof", "foobar", "foo")))
       await(testService.apply(testService.model.Transitions.replace("xx", "o")))
       await(testService.fetch) shouldBe Some(
         (
           "ofrabofbar",
-          List("xxfrabxxfbar", "oofraboofbar", "rabfoobarfoo", "rabfoobar", "raboofbar", "raboof", "foobar", "foo")))
+          List(
+            "xxfrabxxfbar",
+            "oofraboofbar",
+            "rabfoobarfoo",
+            "rabfoobar",
+            "raboofbar",
+            "raboof",
+            "foobar",
+            "foo")))
       await(testService.apply(testService.model.Transitions.reverse))
       await(testService.fetch) shouldBe Some(
         (

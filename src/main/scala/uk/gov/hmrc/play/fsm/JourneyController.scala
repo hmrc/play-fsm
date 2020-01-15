@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 HM Revenue & Customs
+ * Copyright 2020 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -66,8 +66,10 @@ trait JourneyController[RequestContext] {
   def context(implicit rh: RequestHeader): RequestContext
 
   /** interceptor: override to do basic checks on every incoming request (headers, session, etc.) */
-  def withValidRequest(
-    body: => Future[Result])(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
+  def withValidRequest(body: => Future[Result])(
+    implicit rc: RequestContext,
+    request: Request[_],
+    ec: ExecutionContext): Future[Result] =
     body
 
   type Route        = Request[_] => Result
@@ -79,7 +81,8 @@ trait JourneyController[RequestContext] {
 
   /** redirects to the endpoint matching state, eventually override to change details */
   val redirect: RouteFactory =
-    (state: StateAndBreadcrumbs) => (request: Request[_]) => Results.Redirect(getCallFor(state._1)(request))
+    (state: StateAndBreadcrumbs) =>
+      (request: Request[_]) => Results.Redirect(getCallFor(state._1)(request))
 
   //-------------------------------------------------
   // HELPERS
@@ -104,7 +107,8 @@ trait JourneyController[RequestContext] {
     breadcrumbs.headOption.map(getCallFor).getOrElse(getCallFor(journeyService.model.root))
 
   /** action for a given async result function */
-  protected final def action(body: Request[_] => Future[Result])(implicit ec: ExecutionContext): Action[AnyContent] =
+  protected final def action(body: Request[_] => Future[Result])(
+    implicit ec: ExecutionContext): Action[AnyContent] =
     Action.async { implicit request =>
       implicit val rc: RequestContext = context(request)
       withValidRequest(body(request))
@@ -113,8 +117,8 @@ trait JourneyController[RequestContext] {
   type WithAuthorised[User] = Request[_] => (User => Future[Result]) => Future[Result]
 
   /** applies transition parametrized by an authorised user */
-  protected final def whenAuthorised[User](withAuthorised: WithAuthorised[User])(transition: User => Transition)(
-    routeFactory: RouteFactory)(
+  protected final def whenAuthorised[User](withAuthorised: WithAuthorised[User])(
+    transition: User => Transition)(routeFactory: RouteFactory)(
     implicit rc: RequestContext,
     request: Request[_],
     ec: ExecutionContext): Future[Result] =
@@ -123,8 +127,8 @@ trait JourneyController[RequestContext] {
     }
 
   /** applies transition parametrized by an authorised user and form output */
-  protected final def whenAuthorisedWithForm[User, Payload](withAuthorised: WithAuthorised[User])(form: Form[Payload])(
-    transition: User => Payload => Transition)(
+  protected final def whenAuthorisedWithForm[User, Payload](withAuthorised: WithAuthorised[User])(
+    form: Form[Payload])(transition: User => Payload => Transition)(
     implicit rc: RequestContext,
     request: Request[_],
     ec: ExecutionContext): Future[Result] =
@@ -136,7 +140,8 @@ trait JourneyController[RequestContext] {
     * - first transition as provided
     * - second transition parametrized by an authorised user and form output */
   protected final def whenAuthorisedWithBootstrapAndForm[User, Payload, T](bootstrap: Transition)(
-    withAuthorised: WithAuthorised[User])(form: Form[Payload])(transition: User => Payload => Transition)(
+    withAuthorised: WithAuthorised[User])(form: Form[Payload])(
+    transition: User => Payload => Transition)(
     implicit rc: RequestContext,
     request: Request[_],
     ec: ExecutionContext): Future[Result] =

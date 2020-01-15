@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 HM Revenue & Customs
+ * Copyright 2020 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,9 +23,11 @@ trait StateAndBreadcrumbsMatchers {
   def have[S](state: S, breadcrumbs: List[S]): Matcher[Option[(S, List[S])]] =
     new Matcher[Option[(S, List[S])]] {
       override def apply(result: Option[(S, List[S])]): MatchResult = result match {
-        case Some((thisState, thisBreadcrumbs)) if state == thisState && breadcrumbs == thisBreadcrumbs =>
+        case Some((thisState, thisBreadcrumbs))
+            if state == thisState && breadcrumbs == thisBreadcrumbs =>
           MatchResult(true, "", s"End state $state as expected")
-        case Some((thisState, thisBreadcrumbs)) if state == thisState && breadcrumbs != thisBreadcrumbs =>
+        case Some((thisState, thisBreadcrumbs))
+            if state == thisState && breadcrumbs != thisBreadcrumbs =>
           MatchResult(
             false,
             s"End state $state as expected but breadcrumbs different $breadcrumbs != $thisBreadcrumbs",
@@ -49,12 +51,16 @@ trait StateAndBreadcrumbsMatchers {
       }
     }
 
-  def havePattern[S](statePF: PartialFunction[S, Unit], breadcrumbs: List[S]): Matcher[Option[(S, List[S])]] =
+  def havePattern[S](
+    statePF: PartialFunction[S, Unit],
+    breadcrumbs: List[S]): Matcher[Option[(S, List[S])]] =
     new Matcher[Option[(S, List[S])]] {
       override def apply(result: Option[(S, List[S])]): MatchResult = result match {
-        case Some((thisState, thisBreadcrumbs)) if statePF.isDefinedAt(thisState) && breadcrumbs == thisBreadcrumbs =>
+        case Some((thisState, thisBreadcrumbs))
+            if statePF.isDefinedAt(thisState) && breadcrumbs == thisBreadcrumbs =>
           MatchResult(true, "", s"End state as expected")
-        case Some((thisState, thisBreadcrumbs)) if statePF.isDefinedAt(thisState) && breadcrumbs != thisBreadcrumbs =>
+        case Some((thisState, thisBreadcrumbs))
+            if statePF.isDefinedAt(thisState) && breadcrumbs != thisBreadcrumbs =>
           MatchResult(false, s"End state as expected but breadcrumbs different", s"")
         case Some((thisState, _)) if !statePF.isDefinedAt(thisState) =>
           MatchResult(false, s"End state has been expected but got state $thisState", s"")
