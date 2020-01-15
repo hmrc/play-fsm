@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 HM Revenue & Customs
+ * Copyright 2020 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,7 +41,10 @@ class DummyJourneyService extends PersistentJourneyService[DummyContext] {
     ec: ExecutionContext): Unit =
     Await.result(save((state, breadcrumbs)), timeout)
 
-  def get(implicit headerCarrier: DummyContext, timeout: Duration, ec: ExecutionContext): Option[StateAndBreadcrumbs] =
+  def get(
+    implicit headerCarrier: DummyContext,
+    timeout: Duration,
+    ec: ExecutionContext): Option[StateAndBreadcrumbs] =
     Await.result(fetch, timeout)
 
   override def clear(implicit hc: DummyContext, ec: ExecutionContext): Future[Unit] =

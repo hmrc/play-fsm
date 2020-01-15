@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 HM Revenue & Customs
+ * Copyright 2020 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,5 +44,6 @@ trait JourneyModel {
   final def goto(state: State): Future[State]        = Future.successful(state)
   final def fail[T](exception: Exception): Future[T] = Future.failed(exception)
 
-  case class TransitionNotAllowed(state: State, breadcrumbs: List[State], transition: Transition) extends Exception
+  case class TransitionNotAllowed(state: State, breadcrumbs: List[State], transition: Transition)
+      extends Exception
 }

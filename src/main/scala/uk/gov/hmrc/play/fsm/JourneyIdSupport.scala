@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 HM Revenue & Customs
+ * Copyright 2020 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,18 +27,22 @@ trait JourneyIdSupport[RequestContext] {
 
   def amendContext(rc: RequestContext)(key: String, value: String): RequestContext
 
-  def journeyId(implicit rh: RequestHeader): Option[String] = rh.session.get(journeyService.journeyKey)
+  def journeyId(implicit rh: RequestHeader): Option[String] =
+    rh.session.get(journeyService.journeyKey)
 
   def appendJourneyId(rc: RequestContext)(implicit rh: RequestHeader): RequestContext =
     journeyId.map(value => amendContext(rc)(journeyService.journeyKey, value)).getOrElse(rc)
 
   def appendJourneyId(result: Result)(implicit rh: RequestHeader): Result = {
-    val journeyKeyValue = journeyService.journeyKey -> journeyId(rh).getOrElse(UUID.randomUUID().toString)
+    val journeyKeyValue = journeyService.journeyKey -> journeyId(rh).getOrElse(
+      UUID.randomUUID().toString)
     result.withSession(result.session + journeyKeyValue)
   }
 
-  override def withValidRequest(
-    body: => Future[Result])(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
+  override def withValidRequest(body: => Future[Result])(
+    implicit rc: RequestContext,
+    request: Request[_],
+    ec: ExecutionContext): Future[Result] =
     journeyId match {
       case None =>
         journeyService.initialState.map { state =>

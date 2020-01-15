@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 HM Revenue & Customs
+ * Copyright 2020 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,10 +28,11 @@ object DummyJourneyStateFormats extends JsonStateFormats[State] {
     case s: State.Continue => ContinueFormat.writes(s)
     case s: State.Stop     => StopFormat.writes(s)
   }
-  override def deserializeState(stateName: String, properties: JsValue): JsResult[State] = stateName match {
-    case "Start"    => JsSuccess(State.Start)
-    case "Continue" => ContinueFormat.reads(properties)
-    case "Stop"     => StopFormat.reads(properties)
-    case _          => JsError(s"Unknown state name $stateName")
-  }
+  override def deserializeState(stateName: String, properties: JsValue): JsResult[State] =
+    stateName match {
+      case "Start"    => JsSuccess(State.Start)
+      case "Continue" => ContinueFormat.reads(properties)
+      case "Stop"     => StopFormat.reads(properties)
+      case _          => JsError(s"Unknown state name $stateName")
+    }
 }

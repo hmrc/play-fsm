@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 HM Revenue & Customs
+ * Copyright 2020 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,10 @@ import play.api.test.Helpers.{redirectLocation, _}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class DummyJourneyControllerSpec extends UnitSpec with OneAppPerSuite with StateAndBreadcrumbsMatchers {
+class DummyJourneyControllerSpec
+    extends UnitSpec
+    with OneAppPerSuite
+    with StateAndBreadcrumbsMatchers {
 
   implicit val context: DummyContext = DummyContext()
 
@@ -91,7 +94,9 @@ class DummyJourneyControllerSpec extends UnitSpec with OneAppPerSuite with State
       val result = controller.continue(fakeRequest.withFormUrlEncodedBody("arg" -> "foo"))
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/continue")
-      journeyState.get         should have[State](State.Continue("dummy,foo"), List(State.Continue("dummy"), State.Start))
+      journeyState.get should have[State](
+        State.Continue("dummy,foo"),
+        List(State.Continue("dummy"), State.Start))
     }
 
     "after invalid POST /continue stay in Continue when in Continue" in {
@@ -108,7 +113,9 @@ class DummyJourneyControllerSpec extends UnitSpec with OneAppPerSuite with State
       val result = controller.continue(fakeRequest.withFormUrlEncodedBody("arg" -> "foo"))
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/stop")
-      journeyState.get         should have[State](State.Stop("dummy"), List(State.Continue("dummy"), State.Start))
+      journeyState.get should have[State](
+        State.Stop("dummy"),
+        List(State.Continue("dummy"), State.Start))
     }
 
     "after GET /continue show Continue when in Continue" in {
@@ -145,7 +152,9 @@ class DummyJourneyControllerSpec extends UnitSpec with OneAppPerSuite with State
       val result = controller.stop(fakeRequest)
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/stop")
-      journeyState.get         should have[State](State.Stop("dummy"), List(State.Continue("dummy"), State.Start))
+      journeyState.get should have[State](
+        State.Stop("dummy"),
+        List(State.Continue("dummy"), State.Start))
     }
 
     "after POST /stop stay in Stop when in Stop" in {
