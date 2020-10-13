@@ -23,7 +23,7 @@ class JourneyServiceSpec extends UnitSpec {
   implicit val context = DummyContext()
 
   val testService = new PersistentJourneyService[DummyContext]
-  with TestStorage[(String, List[String])] {
+    with TestStorage[(String, List[String])] {
     override val journeyKey: String                                       = "TestJourney"
     override val model                                                    = new TestJourneyModel
     override val breadcrumbsRetentionStrategy: Breadcrumbs => Breadcrumbs = _.take(9)
@@ -40,17 +40,23 @@ class JourneyServiceSpec extends UnitSpec {
       await(testService.fetch) shouldBe Some(("raboofbar", List("raboof", "foobar", "foo")))
       await(testService.apply(testService.model.Transitions.reverse))
       await(testService.fetch) shouldBe Some(
-        ("rabfoobar", List("raboofbar", "raboof", "foobar", "foo")))
+        ("rabfoobar", List("raboofbar", "raboof", "foobar", "foo"))
+      )
       await(testService.apply(testService.model.Transitions.append("foo")))
       await(testService.fetch) shouldBe Some(
-        ("rabfoobarfoo", List("rabfoobar", "raboofbar", "raboof", "foobar", "foo")))
+        ("rabfoobarfoo", List("rabfoobar", "raboofbar", "raboof", "foobar", "foo"))
+      )
       await(testService.apply(testService.model.Transitions.reverse))
       await(testService.fetch) shouldBe Some(
-        ("oofraboofbar", List("rabfoobarfoo", "rabfoobar", "raboofbar", "raboof", "foobar", "foo")))
+        ("oofraboofbar", List("rabfoobarfoo", "rabfoobar", "raboofbar", "raboof", "foobar", "foo"))
+      )
       await(testService.apply(testService.model.Transitions.replace("o", "x")))
-      await(testService.fetch) shouldBe Some((
-        "xxfrabxxfbar",
-        List("oofraboofbar", "rabfoobarfoo", "rabfoobar", "raboofbar", "raboof", "foobar", "foo")))
+      await(testService.fetch) shouldBe Some(
+        (
+          "xxfrabxxfbar",
+          List("oofraboofbar", "rabfoobarfoo", "rabfoobar", "raboofbar", "raboof", "foobar", "foo")
+        )
+      )
       await(testService.apply(testService.model.Transitions.replace("xx", "o")))
       await(testService.fetch) shouldBe Some(
         (
@@ -63,7 +69,10 @@ class JourneyServiceSpec extends UnitSpec {
             "raboofbar",
             "raboof",
             "foobar",
-            "foo")))
+            "foo"
+          )
+        )
+      )
       await(testService.apply(testService.model.Transitions.reverse))
       await(testService.fetch) shouldBe Some(
         (
@@ -77,7 +86,10 @@ class JourneyServiceSpec extends UnitSpec {
             "raboofbar",
             "raboof",
             "foobar",
-            "foo")))
+            "foo"
+          )
+        )
+      )
       await(testService.apply(testService.model.Transitions.append("bar")))
       await(testService.fetch) shouldBe Some(
         (
@@ -92,7 +104,10 @@ class JourneyServiceSpec extends UnitSpec {
             "raboofbar",
             "raboof",
             "foobar",
-            "foo")))
+            "foo"
+          )
+        )
+      )
       await(testService.apply(testService.model.Transitions.reverse))
       await(testService.fetch) shouldBe Some(
         (
@@ -107,7 +122,10 @@ class JourneyServiceSpec extends UnitSpec {
             "rabfoobar",
             "raboofbar",
             "raboof",
-            "foobar"))) // foo is removed because we keep only 10 last states
+            "foobar"
+          )
+        )
+      ) // foo is removed because we keep only 10 last states
     }
   }
 

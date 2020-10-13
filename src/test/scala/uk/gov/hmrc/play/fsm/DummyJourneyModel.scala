@@ -33,15 +33,22 @@ object DummyJourneyModel extends JourneyModel {
 
     val start = DummyJourneyModel.start
 
-    def continue(user: Int)(arg: String) = Transition {
-      case Start          => goto(Continue(arg))
-      case Continue(curr) => goto(Continue(curr + "," + arg))
-    }
+    def showContinue(user: Int) =
+      Transition {
+        case Stop(curr) => goto(Continue(curr.reverse))
+      }
 
-    def stop(user: Int) = Transition {
-      case Start          => goto(Stop(""))
-      case Continue(curr) => goto(Stop(curr))
-    }
+    def continue(user: Int)(arg: String) =
+      Transition {
+        case Start          => goto(Continue(arg))
+        case Continue(curr) => goto(Continue(curr + "," + arg))
+      }
+
+    def stop(user: Int) =
+      Transition {
+        case Start          => goto(Stop(""))
+        case Continue(curr) => goto(Stop(curr))
+      }
   }
 
 }

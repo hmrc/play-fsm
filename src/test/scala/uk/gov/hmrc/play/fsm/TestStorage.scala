@@ -27,13 +27,14 @@ trait TestStorage[S] {
 
   def fetch(implicit hc: DummyContext, ec: ExecutionContext): Future[Option[S]] =
     Future.successful(state.get())
-  def save(newState: S)(implicit hc: DummyContext, ec: ExecutionContext): Future[S] = Future {
-    state
-      .updateAndGet(new UnaryOperator[Option[S]] {
-        override def apply(t: Option[S]): Option[S] = Some(newState)
-      })
-      .get
-  }
+  def save(newState: S)(implicit hc: DummyContext, ec: ExecutionContext): Future[S] =
+    Future {
+      state
+        .updateAndGet(new UnaryOperator[Option[S]] {
+          override def apply(t: Option[S]): Option[S] = Some(newState)
+        })
+        .get
+    }
 
   def clear(): Unit =
     state.set(None)

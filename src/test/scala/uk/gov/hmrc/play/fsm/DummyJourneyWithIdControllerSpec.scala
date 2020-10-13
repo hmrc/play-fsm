@@ -59,7 +59,7 @@ class DummyJourneyWithIdControllerSpec
     "after POST /start with journeyId transition to Start" in {
       journeyState.clear
       val result = controller.start(fakeRequest)
-      status(result)   shouldBe 200
+      status(result) shouldBe 200
       journeyState.get should have[State](State.Start, Nil)
     }
 
@@ -68,20 +68,20 @@ class DummyJourneyWithIdControllerSpec
       val result = controller.showStart(fakeRequest)
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/start")
-      journeyState.get         should have[State](State.Start, Nil)
+      journeyState.get           should have[State](State.Start, Nil)
     }
 
     "after GET /start show Start when in Start" in {
       journeyState.set(State.Start, Nil)
       val result = controller.showStart(fakeRequest)
-      status(result)   shouldBe 200
+      status(result) shouldBe 200
       journeyState.get should have[State](State.Start, Nil)
     }
 
     "after GET /start show previous Start when in Continue" in {
       journeyState.set(State.Continue("dummy"), List(State.Start))
       val result = controller.showStart(fakeRequest)
-      status(result)   shouldBe 200
+      status(result) shouldBe 200
       journeyState.get should have[State](State.Start, Nil)
     }
 
@@ -90,7 +90,7 @@ class DummyJourneyWithIdControllerSpec
       val result = controller.continue(fakeRequest.withFormUrlEncodedBody("arg" -> "dummy"))
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/continue")
-      journeyState.get         should have[State](State.Continue("dummy"), List(State.Start))
+      journeyState.get           should have[State](State.Continue("dummy"), List(State.Start))
     }
 
     "after invalid POST /continue stay in Start when in Start" in {
@@ -98,7 +98,7 @@ class DummyJourneyWithIdControllerSpec
       val result = controller.continue(fakeRequest.withFormUrlEncodedBody())
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/start")
-      journeyState.get         should have[State](State.Start, Nil)
+      journeyState.get           should have[State](State.Start, Nil)
     }
 
     "after POST /continue transition to Continue when in Continue" in {
@@ -108,7 +108,8 @@ class DummyJourneyWithIdControllerSpec
       redirectLocation(result) shouldBe Some("/continue")
       journeyState.get should have[State](
         State.Continue("dummy,foo"),
-        List(State.Continue("dummy"), State.Start))
+        List(State.Continue("dummy"), State.Start)
+      )
     }
 
     "after invalid POST /continue stay in Continue when in Continue" in {
@@ -117,7 +118,7 @@ class DummyJourneyWithIdControllerSpec
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/continue")
       flash(result)            shouldBe Flash(Map("foo" -> "arg"))
-      journeyState.get         should have[State](State.Continue("dummy"), List(State.Start))
+      journeyState.get           should have[State](State.Continue("dummy"), List(State.Start))
     }
 
     "after POST /continue stay in Stop when in Stop" in {
@@ -127,27 +128,28 @@ class DummyJourneyWithIdControllerSpec
       redirectLocation(result) shouldBe Some("/stop")
       journeyState.get should have[State](
         State.Stop("dummy"),
-        List(State.Continue("dummy"), State.Start))
+        List(State.Continue("dummy"), State.Start)
+      )
     }
 
     "after GET /continue show Continue when in Continue" in {
       journeyState.set(State.Continue("dummy"), List(State.Start))
       val result = controller.showContinue(fakeRequest)
-      status(result)   shouldBe 200
+      status(result) shouldBe 200
       journeyState.get should have[State](State.Continue("dummy"), List(State.Start))
     }
 
     "after GET /continue show previous Continue when in Stop" in {
       journeyState.set(State.Stop("dummy"), List(State.Continue("dummy"), State.Start))
       val result = controller.showContinue(fakeRequest)
-      status(result)   shouldBe 200
+      status(result) shouldBe 200
       journeyState.get should have[State](State.Continue("dummy"), List(State.Start))
     }
 
     "after GET /continue go to Start when in Stop but no breadcrumbs" in {
       journeyState.set(State.Stop("dummy"), Nil)
       val result = controller.showContinue(fakeRequest)
-      status(result)   shouldBe 303
+      status(result) shouldBe 303
       journeyState.get should have[State](State.Start, List(State.Stop("dummy")))
     }
 
@@ -156,7 +158,7 @@ class DummyJourneyWithIdControllerSpec
       val result = controller.stop(fakeRequest)
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/stop")
-      journeyState.get         should have[State](State.Stop(""), List(State.Start))
+      journeyState.get           should have[State](State.Stop(""), List(State.Start))
     }
 
     "after POST /stop transition to Stop when in Continue" in {
@@ -166,7 +168,8 @@ class DummyJourneyWithIdControllerSpec
       redirectLocation(result) shouldBe Some("/stop")
       journeyState.get should have[State](
         State.Stop("dummy"),
-        List(State.Continue("dummy"), State.Start))
+        List(State.Continue("dummy"), State.Start)
+      )
     }
 
     "after POST /stop stay in Stop when in Stop" in {
@@ -174,7 +177,7 @@ class DummyJourneyWithIdControllerSpec
       val result = controller.stop(fakeRequest)
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/stop")
-      journeyState.get         should have[State](State.Stop("dummy"), List(State.Start))
+      journeyState.get           should have[State](State.Stop("dummy"), List(State.Start))
     }
 
     "after GET /stop show Stop when in Stop" in {

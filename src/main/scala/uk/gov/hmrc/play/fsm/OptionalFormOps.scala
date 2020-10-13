@@ -24,8 +24,8 @@ object OptionalFormOps {
     def or[T](other: Form[T])(implicit request: Request[_]): Form[T] =
       formOpt
         .map(_.asInstanceOf[Form[T]])
-        .getOrElse({
+        .getOrElse {
           if (request.flash.isEmpty) other else other.bind(request.flash.data)
-        })
+        }
   }
 }

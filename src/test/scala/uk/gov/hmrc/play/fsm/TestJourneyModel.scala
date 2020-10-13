@@ -25,17 +25,20 @@ class TestJourneyModel extends JourneyModel {
 
   object Transitions {
 
-    def append(suffix: String) = Transition {
-      case s => goto(s + suffix)
-    }
+    def append(suffix: String) =
+      Transition {
+        case s => goto(s + suffix)
+      }
 
-    def reverse = Transition {
-      case s => goto(s.reverse)
-    }
+    def reverse =
+      Transition {
+        case s => goto(s.reverse)
+      }
 
-    def replace(a: String, b: String) = Transition {
-      case s => goto(s.replaceAllLiterally(a, b))
-    }
+    def replace(a: String, b: String) =
+      Transition {
+        case s => goto(s.replaceAllLiterally(a, b))
+      }
 
   }
 }
