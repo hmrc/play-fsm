@@ -28,17 +28,20 @@ trait JsonStateFormats[State] {
   def deserializeState(stateName: String, properties: JsValue): JsResult[State]
 
   final val reads: Reads[State] = new Reads[State] {
-    override def reads(json: JsValue): JsResult[State] = json match {
-      case obj: JsObject =>
-        (obj \ "state")
-          .asOpt[String]
-          .map(s => (obj \ "properties").asOpt[JsValue].map(p => (s, p)).getOrElse((s, JsNull))) match {
-          case Some((stateName, properties)) => deserializeState(stateName, properties)
-          case None                          => JsError("Missing state field")
-        }
+    override def reads(json: JsValue): JsResult[State] =
+      json match {
+        case obj: JsObject =>
+          (obj \ "state")
+            .asOpt[String]
+            .map(s =>
+              (obj \ "properties").asOpt[JsValue].map(p => (s, p)).getOrElse((s, JsNull))
+            ) match {
+            case Some((stateName, properties)) => deserializeState(stateName, properties)
+            case None                          => JsError("Missing state field")
+          }
 
-      case o => JsError(s"Cannot parse State from $o, must be JsObject.")
-    }
+        case o => JsError(s"Cannot parse State from $o, must be JsObject.")
+      }
   }
 
   final val writes: Writes[State] = new Writes[State] {
@@ -46,7 +49,8 @@ trait JsonStateFormats[State] {
       if (serializeStateProperties.isDefinedAt(state)) serializeStateProperties(state) match {
         case JsNull     => Json.obj("state" -> nameOf(state))
         case properties => Json.obj("state" -> nameOf(state), "properties" -> properties)
-      } else Json.obj("state" -> nameOf(state))
+      }
+      else Json.obj("state" -> nameOf(state))
   }
 
   final def formats: Format[State] = Format(reads, writes)

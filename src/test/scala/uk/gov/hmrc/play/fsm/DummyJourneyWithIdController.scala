@@ -26,9 +26,9 @@ import scala.concurrent.ExecutionContext
 import scala.util.Success
 
 @Singleton
-class DummyJourneyWithIdController @Inject()(override val journeyService: DummyJourneyService)(
-  implicit ec: ExecutionContext)
-    extends Controller
+class DummyJourneyWithIdController @Inject() (override val journeyService: DummyJourneyService)(
+  implicit ec: ExecutionContext
+) extends Controller
     with JourneyController[DummyContext]
     with JourneyIdSupport[DummyContext] {
 
@@ -56,9 +56,10 @@ class DummyJourneyWithIdController @Inject()(override val journeyService: DummyJ
     case State.Start =>
   }
 
-  def continue: Action[AnyContent] = action { implicit request =>
-    whenAuthorisedWithForm(asUser)(ArgForm)(Transitions.continue)
-  }
+  def continue: Action[AnyContent] =
+    action { implicit request =>
+      whenAuthorisedWithForm(asUser)(ArgForm)(Transitions.continue)
+    }
 
   val showContinue: Action[AnyContent] = actionShowStateWhenAuthorised(asUser) {
     case State.Continue(_) =>
@@ -90,7 +91,8 @@ class DummyJourneyWithIdController @Inject()(override val journeyService: DummyJ
   override def renderState(
     state: journeyService.model.State,
     breadcrumbs: List[journeyService.model.State],
-    formWithErrors: Option[Form[_]])(implicit request: Request[_]): Result =
+    formWithErrors: Option[Form[_]]
+  )(implicit request: Request[_]): Result =
     state match {
       case State.Start =>
         Ok(Html(s"""Start | <a href="${backLinkFor(breadcrumbs).url}">back</a>"""))

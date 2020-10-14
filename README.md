@@ -76,10 +76,15 @@ If needed *controller* and *service* can exercise fine control over the journey 
 ### Advanced examples:
 - Agent Invitations: 
     - Models: <https://github.com/hmrc/agent-invitations-frontend/tree/master/app/uk/gov/hmrc/agentinvitationsfrontend/journeys>
-    - Controllers: <https://github.com/hmrc/agent-invitations-frontend/blob/master/app/uk/gov/hmrc/agentinvitationsfrontend/controllers/>
-- Agent-Client relationships management help-desk: 
-    - Models: <https://github.com/hmrc/agent-client-management-helpdesk-frontend/blob/master/app/uk/gov/hmrc/agentclientmanagementhelpdeskfrontend/journeys/>
-    - Controllers: <https://github.com/hmrc/agent-client-management-helpdesk-frontend/blob/master/app/uk/gov/hmrc/agentclientmanagementhelpdeskfrontend/controllers/>
+    - Controllers: <https://github.com/hmrc/agent-invitations-frontend/blob/master/app/uk/gov/hmrc/agentinvitationsfrontend/controllers>
+
+- Home Office Settled Status:
+    - Model: <https://github.com/hmrc/home-office-settled-status-frontend/blob/master/app/uk/gov/hmrc/homeofficesettledstatus/journeys>
+    - Controller: <https://github.com/hmrc/home-office-settled-status-frontend/blob/master/app/uk/gov/hmrc/homeofficesettledstatus/controllers>
+
+- Trader Services:
+    - Models: https://github.com/hmrc/trader-services-route-one-frontend/tree/master/app/uk/gov/hmrc/traderservices/journeys
+    - Controllers: <https://github.com/hmrc/trader-services-route-one-frontend/tree/master/app/uk/gov/hmrc/traderservices/controllers>
 
 ### Best practices
 - Keep a single model definition in a single file.
@@ -217,8 +222,12 @@ Inside your `XYZController extends JourneyController[MyContext]` implement:
 
 ### Controller patterns
 
-- render current or previous state matching expectation
+- render the current state or rewind to the previous state matching pattern
 
+```
+    val showStart: Action[AnyContent] = actions.show[State.Start.type]
+```
+or
 ```
     val showStart: Action[AnyContent] = actionShowState {
         case State.Start =>
@@ -228,9 +237,19 @@ Inside your `XYZController extends JourneyController[MyContext]` implement:
 - make a state transition and redirect to the new state
 
 ```
+    val stop: Action[AnyContent] = actions.apply(Transitions.stop)
+```
+or
+```
     val stop: Action[AnyContent] = action { implicit request =>
         apply(Transitions.stop)(redirect)
       }
+```
+
+- render the current state or apply transition
+
+```
+    val showStart: Action[AnyContent] = actions.showOrApply[State.Start.type](Transitions.start)
 ```
 
 - clear or refine journey history after transition (cleanBreadcrumbs)
@@ -288,6 +307,12 @@ Inside your `XYZController extends JourneyController[MyContext]` implement:
 - transition only when user has been authorized
 
 ```
+    val stop: Action[AnyContent] = actions
+        .whenAuthorised(asUser)
+        .apply(Transitions.stop)
+```
+or
+```
     val stop: Action[AnyContent] = action { implicit request =>
         whenAuthorised(asUser)(Transitions.stop)(redirect)
       }
@@ -296,8 +321,20 @@ Inside your `XYZController extends JourneyController[MyContext]` implement:
 - display page for an authorized user only
 
 ```
+    val showContinue: Action[AnyContent] = actions.whenAuthorised(asUser).show[State.Continue]
+```
+or
+```
     val showContinue: Action[AnyContent] = actionShowStateWhenAuthorised(asUser) {
         case State.Continue(_) =>
       }
+```
+
+- render the current state or apply transition
+
+```
+    val showContinue: Action[AnyContent] = actions
+        .whenAuthorised(asUser)
+        .showOrApply[State.Start.type](Transitions.continue)
 ```
 

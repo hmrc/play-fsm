@@ -25,9 +25,9 @@ import uk.gov.hmrc.play.fsm.OptionalFormOps._
 import scala.concurrent.ExecutionContext
 
 @Singleton
-class DummyJourneyController @Inject()(override val journeyService: DummyJourneyService)(
-  implicit ec: ExecutionContext)
-    extends Controller
+class DummyJourneyController @Inject() (override val journeyService: DummyJourneyService)(implicit
+  ec: ExecutionContext
+) extends Controller
     with JourneyController[DummyContext] {
 
   import DummyJourneyController._
@@ -51,21 +51,38 @@ class DummyJourneyController @Inject()(override val journeyService: DummyJourney
     case State.Start =>
   }
 
-  def continue: Action[AnyContent] = action { implicit request =>
-    whenAuthorisedWithForm(asUser)(ArgForm)(Transitions.continue)
-  }
+  val showStartDsl: Action[AnyContent] =
+    actions.show[State.Start.type]
+
+  def continue: Action[AnyContent] =
+    action { implicit request =>
+      whenAuthorisedWithForm(asUser)(ArgForm)(Transitions.continue)
+    }
+
+  def continueDsl: Action[AnyContent] =
+    actions.whenAuthorised(asUser).bindForm(ArgForm).apply(Transitions.continue)
 
   val showContinue: Action[AnyContent] = actionShowStateWhenAuthorised(asUser) {
     case State.Continue(_) =>
   }
 
+  val showContinueDsl: Action[AnyContent] =
+    actions.whenAuthorised(asUser).show[State.Continue]
+
+  val showOrApplyContinueDsl: Action[AnyContent] =
+    actions.whenAuthorised(asUser).showOrApply[State.Continue](Transitions.showContinue)
+
   val stop: Action[AnyContent] = action { implicit request =>
     whenAuthorised(asUser)(Transitions.stop)(redirect)
   }
 
+  val stopDsl: Action[AnyContent] = actions.whenAuthorised(asUser).apply(Transitions.stop)
+
   val showStop: Action[AnyContent] = actionShowStateWhenAuthorised(asUser) {
     case State.Stop(_) =>
   }
+
+  val showStopDsl: Action[AnyContent] = actions.whenAuthorised(asUser).show[State.Stop]
 
   // VIEWS
 
@@ -81,7 +98,8 @@ class DummyJourneyController @Inject()(override val journeyService: DummyJourney
   override def renderState(
     state: journeyService.model.State,
     breadcrumbs: List[journeyService.model.State],
-    formWithErrors: Option[Form[_]])(implicit request: Request[_]): Result =
+    formWithErrors: Option[Form[_]]
+  )(implicit request: Request[_]): Result =
     state match {
       case State.Start =>
         Ok(Html(s"""Start | <a href="${backLinkFor(breadcrumbs).url}">back</a>"""))
