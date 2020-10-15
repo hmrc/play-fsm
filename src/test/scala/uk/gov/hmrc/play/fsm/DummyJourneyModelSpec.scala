@@ -15,15 +15,16 @@
  */
 
 package uk.gov.hmrc.play.fsm
-import DummyJourneyModel.{State, Transition, TransitionNotAllowed, Transitions}
+import DummyJourneyModel.{Merger, Mergers, State, Transition, TransitionNotAllowed, Transitions}
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.reflect.ClassTag
 
 class DummyJourneyModelSpec extends UnitSpec with StateMatchers[State] {
 
   implicit val context: DummyContext = DummyContext()
 
-  case class given(initialState: State) extends DummyJourneyService {
+  case class given[S <: State: ClassTag](initialState: S) extends DummyJourneyService {
     Option(initialState) match {
       case Some(state) => await(save((state, Nil)))
       case None        => ()
@@ -39,6 +40,9 @@ class DummyJourneyModelSpec extends UnitSpec with StateMatchers[State] {
 
     def when(transition: Transition): (State, List[State]) =
       await(super.apply(transition).recover { case TransitionNotAllowed(s, b, _) => (s, b) })
+
+    def when(merger: Merger[S], state: State): (State, List[State]) =
+      await(super.modify { s: S => merger.apply((s, state)) })
   }
 
   "DummyJourneyModel" when {
@@ -81,6 +85,11 @@ class DummyJourneyModelSpec extends UnitSpec with StateMatchers[State] {
       }
       "go to the Continue state after `stop` transition" in {
         given(State.Continue("dummy")) when Transitions.stop(5) should thenGo(State.Stop("dummy"))
+      }
+      "copy value from Stop" in {
+        given(State.Continue("dummy")) when (Mergers.toContinue, State.Stop("dummy")) should thenGo(
+          State.Continue("dummy_dummy")
+        )
       }
     }
 

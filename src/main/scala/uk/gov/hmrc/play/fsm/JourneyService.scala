@@ -36,7 +36,7 @@ trait JourneyService[RequestContext] {
   )(implicit rc: RequestContext, ec: ExecutionContext): Future[StateAndBreadcrumbs]
 
   /** Applies modification to the current state and returns new state */
-  private[fsm] def modify[S <: model.State: ClassTag](
+  protected[fsm] def modify[S <: model.State: ClassTag](
     modify: S => S
   )(implicit rc: RequestContext, ec: ExecutionContext): Future[StateAndBreadcrumbs]
 
@@ -113,7 +113,7 @@ trait PersistentJourneyService[RequestContext] extends JourneyService[RequestCon
       }
     } yield endStateOrError
 
-  override private[fsm] def modify[S <: model.State: ClassTag](
+  override protected[fsm] def modify[S <: model.State: ClassTag](
     modification: S => S
   )(implicit rc: RequestContext, ec: ExecutionContext): Future[StateAndBreadcrumbs] =
     for {

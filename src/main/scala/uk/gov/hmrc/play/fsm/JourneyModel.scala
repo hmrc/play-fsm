@@ -51,10 +51,10 @@ trait JourneyModel {
   case class TransitionNotAllowed(state: State, breadcrumbs: List[State], transition: Transition)
       extends Exception
 
-  class Merge[S <: State] private (val apply: PartialFunction[(S, State), S])
+  class Merger[S <: State] private (val apply: PartialFunction[(S, State), S])
 
-  /** Merge builder */
-  protected object Merge {
-    def apply[S <: State](merge: PartialFunction[(S, State), S]): Merge[S] = new Merge(merge)
+  /** Merger builder */
+  protected object Merger {
+    def apply[S <: State](merge: PartialFunction[(S, State), S]): Merger[S] = new Merger(merge)
   }
 }
