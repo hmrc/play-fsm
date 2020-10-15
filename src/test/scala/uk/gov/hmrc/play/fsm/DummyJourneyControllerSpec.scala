@@ -377,18 +377,18 @@ class DummyJourneyControllerSpec
       journeyState.get should have[State](State.Stop("dummy"), List(State.Start))
     }
 
-    "dsl: after GET /stop show Stop when in Stop" in {
-      journeyState.set(State.Stop("dummy"), List(State.Start))
-      val result = controller.showStopDsl(fakeRequest)
-      status(result) shouldBe 200
-      journeyState.get should have[State](State.Stop("dummy"), List(State.Start))
-    }
-
     "dsl+clean: after GET /stop show Stop when in Stop" in {
       journeyState.set(State.Stop("dummy"), List(State.Start))
       val result = controller.showStopDsl2(fakeRequest)
       status(result) shouldBe 200
       journeyState.get should have[State](State.Stop("dummy"), Nil)
+    }
+
+    "dsl: after GET /stop show Stop when in Stop" in {
+      journeyState.set(State.Stop("dummy"), List(State.Start))
+      val result = controller.showStopDsl(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](State.Stop("dummy"), List(State.Start))
     }
 
   }

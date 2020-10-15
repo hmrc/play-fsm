@@ -44,7 +44,7 @@ Journey is only loosely related to the HTTP and user session, in fact, depending
 implementation it can be a part of a user session, span multiple sessions or cross authorisation boundary. 
 It is expected of an application to consist of one or more journeys. 
 
-Journey is build out of **State**s, **Transition**s and **Merge**s. 
+Journey is build out of **State**s, **Transition**s and **Merger**s. 
 
 **State** can be anything but usually it will be a set of case classes/objects representing the stage and data of a business transaction. 
 State is not expected to have finite values, can be continuous if needed!
@@ -53,7 +53,7 @@ State is not expected to have finite values, can be continuous if needed!
 Transition should be a *pure* function, depending only on its own parameters and the current state. 
 External async requests to the upstream services should be provided as a function-type parameters. 
 
-**Merge** is a partial function of type `(S <: State, State) => S`, used to reconcile two states when going backward in the journey. 
+**Merger** is a partial function of type `(S <: State, State) => S`, used to reconcile two states when going backward in the journey. 
 
 **Breadcrumbs** is a reversed list of previous states (the head is the last one) forming journey history.
 History is available only to the *service* and *controller* layers, *model* by design has no implicit knowledge of the history.
@@ -223,18 +223,18 @@ Inside your `XYZController extends JourneyController[MyContext]` implement:
     }
 ```
 
-#### Merge definition pattern
+#### Merger definition pattern
 
 ```
-    object Merging {
+    object Mergers {
 
         def toStart =
-            Merge[State.Start.type] {
+            Merger[State.Start.type] {
                 case (state, _) => State.Start
             }
 
         def toContinue =
-            Merge[State.Continue] {
+            Merger[State.Continue] {
                 case (state, State.Stop(curr)) => state.copy(arg = curr + "_" + curr)
             }
 
@@ -260,7 +260,7 @@ or
 ```
     val showStart: Action[AnyContent] = actions
         .show[State.Start.type]
-        .using(Merging.toStart)
+        .using(Mergers.toStart)
 ```
 
 - render the current state if matches the pattern (type), otherwise apply the transition and redirect to the resulting state
@@ -382,6 +382,6 @@ or
     val showContinue: Action[AnyContent] = actions
         .whenAuthorised(asUser)
         .show[State.Continue]
-        .using(Merging.toContinue)
+        .using(Mergers.toContinue)
 ```
 

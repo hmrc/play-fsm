@@ -41,7 +41,7 @@ trait JourneyController[RequestContext] {
   val journeyService: JourneyService[RequestContext]
 
   import journeyService.{Breadcrumbs, StateAndBreadcrumbs}
-  import journeyService.model.{Merge, State, Transition, TransitionNotAllowed}
+  import journeyService.model.{Merger, State, Transition, TransitionNotAllowed}
 
   //-------------------------------------------------
   // EXTENSION POINTS
@@ -205,7 +205,7 @@ trait JourneyController[RequestContext] {
   protected final def showStateUsingMerge[S <: State: ClassTag](
     expectedStates: ExpectedStates
   )(
-    merge: Merge[S]
+    merge: Merger[S]
   )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
     for {
       stateAndBreadcrumbsOpt <- journeyService.currentState
@@ -266,7 +266,7 @@ trait JourneyController[RequestContext] {
   )(
     expectedStates: ExpectedStates
   )(
-    merge: Merge[S]
+    merge: Merger[S]
   )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
     withAuthorised(request) { _ =>
       showStateUsingMerge(expectedStates)(merge)
@@ -391,15 +391,15 @@ trait JourneyController[RequestContext] {
         * and apply merge function to reconcile the new state with the outgoing,
         * or redirect back to the root state.
         */
-      def using(merge: Merge[S]): UsingMerge = new UsingMerge(merge)
+      def using(merger: Merger[S]): UsingMerger = new UsingMerger(merger)
 
-      class UsingMerge private[actions] (merge: Merge[S]) extends Executable {
+      class UsingMerger private[actions] (merger: Merger[S]) extends Executable {
         override def execute(implicit
           request: Request[_],
           ec: ExecutionContext
         ): Future[Result] = {
           implicit val rc: RequestContext = JourneyController.this.context(request)
-          JourneyController.this.showStateUsingMerge[S] { case _: S => }(merge)
+          JourneyController.this.showStateUsingMerge[S] { case _: S => }(merger)
         }
       }
     }
@@ -492,9 +492,9 @@ trait JourneyController[RequestContext] {
           * and apply merge function to reconcile the new state with the outgoing,
           * or redirect back to the root state.
           */
-        def using(merge: Merge[S]): UsingMerge = new UsingMerge(merge)
+        def using(merge: Merger[S]): UsingMerger = new UsingMerger(merge)
 
-        class UsingMerge private[actions] (merge: Merge[S]) extends Executable {
+        class UsingMerger private[actions] (merge: Merger[S]) extends Executable {
           override def execute(implicit
             request: Request[_],
             ec: ExecutionContext

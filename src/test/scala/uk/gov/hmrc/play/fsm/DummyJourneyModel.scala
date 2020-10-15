@@ -51,15 +51,15 @@ object DummyJourneyModel extends JourneyModel {
       }
   }
 
-  object Merging {
+  object Mergers {
 
     def toStart =
-      Merge[State.Start.type] {
+      Merger[State.Start.type] {
         case (state, State.Stop(curr)) => State.Start
       }
 
     def toContinue =
-      Merge[State.Continue] {
+      Merger[State.Continue] {
         case (state, State.Stop(curr)) => state.copy(arg = curr + "_" + curr)
       }
 

@@ -31,7 +31,7 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
     with JourneyController[DummyContext] {
 
   import DummyJourneyController._
-  import journeyService.model.{Merging, State, Transitions}
+  import journeyService.model.{Mergers, State, Transitions}
 
   override implicit def context(implicit rh: RequestHeader): DummyContext = DummyContext()
 
@@ -58,7 +58,7 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
     actions.show[State.Start.type].andCleanBreadcrumbs()
 
   val showStartDsl3: Action[AnyContent] =
-    actions.show[State.Start.type].using(Merging.toStart)
+    actions.show[State.Start.type].using(Mergers.toStart)
 
   def continue: Action[AnyContent] =
     action { implicit request =>
@@ -76,7 +76,7 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
     actions.whenAuthorised(asUser).show[State.Continue]
 
   val showContinueDsl2: Action[AnyContent] =
-    actions.whenAuthorised(asUser).show[State.Continue].using(Merging.toContinue)
+    actions.whenAuthorised(asUser).show[State.Continue].using(Mergers.toContinue)
 
   val showOrApplyContinueDsl: Action[AnyContent] =
     actions.whenAuthorised(asUser).show[State.Continue].orApply(Transitions.showContinue)
