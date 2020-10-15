@@ -59,6 +59,30 @@ class DummyJourneyControllerSpec
       journeyState.get           should have[State](State.Start, Nil)
     }
 
+    "dsl: after GET /start transition to Start when uninitialized" in {
+      journeyState.clear
+      val result = controller.showStartDsl(fakeRequest)
+      status(result)           shouldBe 303
+      redirectLocation(result) shouldBe Some("/start")
+      journeyState.get           should have[State](State.Start, Nil)
+    }
+
+    "dsl+clean: after GET /start transition to Start when uninitialized" in {
+      journeyState.clear
+      val result = controller.showStartDsl2(fakeRequest)
+      status(result)           shouldBe 303
+      redirectLocation(result) shouldBe Some("/start")
+      journeyState.get           should have[State](State.Start, Nil)
+    }
+
+    "dsl+merge: after GET /start transition to Start when uninitialized" in {
+      journeyState.clear
+      val result = controller.showStartDsl3(fakeRequest)
+      status(result)           shouldBe 303
+      redirectLocation(result) shouldBe Some("/start")
+      journeyState.get           should have[State](State.Start, Nil)
+    }
+
     "after GET /start show Start when in Start" in {
       journeyState.set(State.Start, Nil)
       val result = controller.showStart(fakeRequest)
@@ -73,6 +97,20 @@ class DummyJourneyControllerSpec
       journeyState.get should have[State](State.Start, Nil)
     }
 
+    "dsl+clean: after GET /start show Start when in Start" in {
+      journeyState.set(State.Start, Nil)
+      val result = controller.showStartDsl2(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](State.Start, Nil)
+    }
+
+    "dsl+merge: after GET /start show Start when in Start" in {
+      journeyState.set(State.Start, Nil)
+      val result = controller.showStartDsl3(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](State.Start, Nil)
+    }
+
     "after GET /start show previous Start when in Continue" in {
       journeyState.set(State.Continue("dummy"), List(State.Start))
       val result = controller.showStart(fakeRequest)
@@ -83,6 +121,20 @@ class DummyJourneyControllerSpec
     "dsl: after GET /start show previous Start when in Continue" in {
       journeyState.set(State.Continue("dummy"), List(State.Start))
       val result = controller.showStartDsl(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](State.Start, Nil)
+    }
+
+    "dsl+clean: after GET /start show previous Start when in Continue" in {
+      journeyState.set(State.Continue("dummy"), List(State.Start))
+      val result = controller.showStartDsl2(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](State.Start, Nil)
+    }
+
+    "dsl+merge: after GET /start show previous Start when in Continue" in {
+      journeyState.set(State.Continue("dummy"), List(State.Start))
+      val result = controller.showStartDsl3(fakeRequest)
       status(result) shouldBe 200
       journeyState.get should have[State](State.Start, Nil)
     }
@@ -195,9 +247,16 @@ class DummyJourneyControllerSpec
       journeyState.get should have[State](State.Continue("dummy"), List(State.Start))
     }
 
-    "dsl2: after GET /continue show Continue when in Continue" in {
+    "dsl+apply: after GET /continue show Continue when in Continue" in {
       journeyState.set(State.Continue("dummy"), List(State.Start))
       val result = controller.showOrApplyContinueDsl(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](State.Continue("dummy"), List(State.Start))
+    }
+
+    "dsl+merge: after GET /continue show Continue when in Continue" in {
+      journeyState.set(State.Continue("dummy"), List(State.Start))
+      val result = controller.showContinueDsl2(fakeRequest)
       status(result) shouldBe 200
       journeyState.get should have[State](State.Continue("dummy"), List(State.Start))
     }
@@ -216,13 +275,23 @@ class DummyJourneyControllerSpec
       journeyState.get should have[State](State.Continue("dummy"), List(State.Start))
     }
 
-    "dsl2: after GET /continue show new Continue when in Stop" in {
+    "dsl+apply: after GET /continue show new Continue when in Stop" in {
       journeyState.set(State.Stop("dummy"), List(State.Continue("dummy"), State.Start))
       val result = controller.showOrApplyContinueDsl(fakeRequest)
       status(result) shouldBe 303
       journeyState.get should have[State](
         State.Continue("ymmud"),
         List(State.Stop("dummy"), State.Continue("dummy"), State.Start)
+      )
+    }
+
+    "dsl+merge: after GET /continue show merged Continue when in Stop" in {
+      journeyState.set(State.Stop("dummy"), List(State.Continue("dummy"), State.Start))
+      val result = controller.showContinueDsl2(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](
+        State.Continue("dummy_dummy"),
+        List(State.Start)
       )
     }
 
@@ -313,6 +382,13 @@ class DummyJourneyControllerSpec
       val result = controller.showStopDsl(fakeRequest)
       status(result) shouldBe 200
       journeyState.get should have[State](State.Stop("dummy"), List(State.Start))
+    }
+
+    "dsl+clean: after GET /stop show Stop when in Stop" in {
+      journeyState.set(State.Stop("dummy"), List(State.Start))
+      val result = controller.showStopDsl2(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](State.Stop("dummy"), Nil)
     }
 
   }

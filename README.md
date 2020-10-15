@@ -44,19 +44,22 @@ Journey is only loosely related to the HTTP and user session, in fact, depending
 implementation it can be a part of a user session, span multiple sessions or cross authorisation boundary. 
 It is expected of an application to consist of one or more journeys. 
 
-Journey is build out of **State**s and **Transition**s. 
+Journey is build out of **State**s, **Transition**s and **Merge**s. 
 
 **State** can be anything but usually it will be a set of case classes/objects representing the stage and data of a business transaction. 
 State is not expected to have finite values, can be continuous if needed!
 
-**Transition** is a means of moving from one state to another. It's type is a partial async function `State => Future[State]`. 
+**Transition** is a means of moving forward from one state to the another. It's type is a partial async function `State => Future[State]`. 
 Transition should be a *pure* function, depending only on its own parameters and the current state. 
 External async requests to the upstream services should be provided as a function-type parameters. 
 
+**Merge** is a partial function of type `(S <: State, State) => S`, used to reconcile two states when going backward in the journey. 
+
 **Breadcrumbs** is a reversed list of previous states (the head is the last one) forming journey history.
 History is available only to the *service* and *controller* layers, *model* by design has no implicit knowledge of the history.
-Breadcrumbs allow for safe backlinking and rewinding.
-If needed *controller* and *service* can exercise fine control over the journey history.
+Breadcrumbs allow for safe back-linking and rolling history back.
+
+If needed, both *controller* and *service* can exercise fine control over the journey history.
 
 ### Benefits
 - proper concern separation: 
@@ -220,9 +223,27 @@ Inside your `XYZController extends JourneyController[MyContext]` implement:
     }
 ```
 
+#### Merge definition pattern
+
+```
+    object Merging {
+
+        def toStart =
+            Merge[State.Start.type] {
+                case (state, _) => State.Start
+            }
+
+        def toContinue =
+            Merge[State.Continue] {
+                case (state, State.Stop(curr)) => state.copy(arg = curr + "_" + curr)
+            }
+
+    }
+```
+
 ### Controller patterns
 
-- render the current state or rewind to the previous state matching pattern
+- render the state matching the pattern (type), eventually rolling history back
 
 ```
     val showStart: Action[AnyContent] = actions.show[State.Start.type]
@@ -234,7 +255,23 @@ or
       }
 ```
 
-- make a state transition and redirect to the new state
+- render the state matching the pattern (type), eventually rolling history back and merging historic state with the current one
+
+```
+    val showStart: Action[AnyContent] = actions
+        .show[State.Start.type]
+        .using(Merging.toStart)
+```
+
+- render the current state if matches the pattern (type), otherwise apply the transition and redirect to the resulting state
+
+```
+    val showStart: Action[AnyContent] = actions
+        .show[State.Start.type]
+        .orApply(Transitions.start)
+```
+
+- apply the transition to current state and redirect to the resulting state
 
 ```
     val stop: Action[AnyContent] = actions.apply(Transitions.stop)
@@ -246,14 +283,12 @@ or
       }
 ```
 
-- render the current state or apply transition
-
-```
-    val showStart: Action[AnyContent] = actions.showOrApply[State.Start.type](Transitions.start)
-```
-
 - clear or refine journey history after transition (cleanBreadcrumbs)
 
+```
+    val showStart: Action[AnyContent] = actions.show[State.Start.type].andCleanBreadcrumbs()
+```
+or
 ```
     def showTheEndState = action { implicit request =>
         showStateWhenAuthorised(AsUser) {
@@ -321,7 +356,9 @@ or
 - display page for an authorized user only
 
 ```
-    val showContinue: Action[AnyContent] = actions.whenAuthorised(asUser).show[State.Continue]
+    val showContinue: Action[AnyContent] = actions
+        .whenAuthorised(asUser)
+        .show[State.Continue]
 ```
 or
 ```
@@ -330,11 +367,21 @@ or
       }
 ```
 
-- render the current state or apply transition
+-  for an authorized user only, render the current state if matches the pattern (type), otherwise apply the transition and redirect to the resulting state
 
 ```
     val showContinue: Action[AnyContent] = actions
         .whenAuthorised(asUser)
-        .showOrApply[State.Start.type](Transitions.continue)
+        .show[State.Continue]
+        .orApply(Transitions.continue)
+```
+
+- for an authorized user only, apply the transition to current state and redirect to the resulting state
+
+```
+    val showContinue: Action[AnyContent] = actions
+        .whenAuthorised(asUser)
+        .show[State.Continue]
+        .using(Merging.toContinue)
 ```
 

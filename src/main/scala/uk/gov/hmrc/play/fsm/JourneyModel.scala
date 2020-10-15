@@ -29,6 +29,7 @@ trait JourneyModel {
 
   class Transition private (val apply: PartialFunction[State, Future[State]])
 
+  /** Transition builder */
   protected object Transition {
     def apply(rules: PartialFunction[State, Future[State]]): Transition = new Transition(rules)
   }
@@ -41,9 +42,19 @@ trait JourneyModel {
     case _ => goto(root)
   }
 
-  final def goto(state: State): Future[State]        = Future.successful(state)
+  /** Replace the current state with the new one. */
+  final def goto(state: State): Future[State] = Future.successful(state)
+
+  /** Fail the transition */
   final def fail[T](exception: Exception): Future[T] = Future.failed(exception)
 
   case class TransitionNotAllowed(state: State, breadcrumbs: List[State], transition: Transition)
       extends Exception
+
+  class Merge[S <: State] private (val apply: PartialFunction[(S, State), S])
+
+  /** Merge builder */
+  protected object Merge {
+    def apply[S <: State](merge: PartialFunction[(S, State), S]): Merge[S] = new Merge(merge)
+  }
 }

@@ -17,6 +17,7 @@
 package uk.gov.hmrc.play.fsm
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.reflect.ClassTag
 
 /**
   * JourneyService is an abstract base of components exposing journey to the application (controller)
@@ -32,6 +33,11 @@ trait JourneyService[RequestContext] {
   /** Applies transition to the current state and returns new state or error */
   def apply(
     transition: model.Transition
+  )(implicit rc: RequestContext, ec: ExecutionContext): Future[StateAndBreadcrumbs]
+
+  /** Applies modification to the current state and returns new state */
+  private[fsm] def modify[S <: model.State: ClassTag](
+    modify: S => S
   )(implicit rc: RequestContext, ec: ExecutionContext): Future[StateAndBreadcrumbs]
 
   /** Returns current state (if any) and breadcrumbs */
@@ -64,6 +70,7 @@ trait PersistentJourneyService[RequestContext] extends JourneyService[RequestCon
     rc: RequestContext,
     ec: ExecutionContext
   ): Future[Option[StateAndBreadcrumbs]]
+
   protected def save(
     state: StateAndBreadcrumbs
   )(implicit rc: RequestContext, ec: ExecutionContext): Future[StateAndBreadcrumbs]
@@ -105,6 +112,23 @@ trait PersistentJourneyService[RequestContext] extends JourneyService[RequestCon
           model.fail(model.TransitionNotAllowed(state, breadcrumbs, transition))
       }
     } yield endStateOrError
+
+  override private[fsm] def modify[S <: model.State: ClassTag](
+    modification: S => S
+  )(implicit rc: RequestContext, ec: ExecutionContext): Future[StateAndBreadcrumbs] =
+    for {
+      initialStateAndBreadcrumbsOpt <- fetch
+      stateAndBreadcrumbs <- initialStateAndBreadcrumbsOpt match {
+                               case Some((state, breadcrumbs))
+                                   if implicitly[ClassTag[S]].runtimeClass.isAssignableFrom(
+                                     state.getClass
+                                   ) =>
+                                 val newState = modification(state.asInstanceOf[S])
+                                 if (newState != state) save((newState, breadcrumbs))
+                                 else Future.successful((newState, breadcrumbs))
+                               case _ => Future.successful((model.root, Nil))
+                             }
+    } yield stateAndBreadcrumbs
 
   override def currentState(implicit
     rc: RequestContext,
