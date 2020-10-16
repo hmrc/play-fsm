@@ -96,6 +96,19 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
   val showStopDsl2: Action[AnyContent] =
     actions.whenAuthorised(asUser).show[State.Stop].andCleanBreadcrumbs()
 
+  val showDeadEndDsl: Action[AnyContent] =
+    actions
+      .show[State.DeadEnd]
+      .using(Mergers.toDeadEnd)
+      .orApply(Transitions.toDeadEnd)
+
+  val showDeadEndDsl2: Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .show[State.DeadEnd]
+      .using(Mergers.toDeadEnd)
+      .orApply(user => Transitions.toDeadEnd)
+
   // VIEWS
 
   /** implement this to map states into endpoints for redirection and back linking */
@@ -104,6 +117,7 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
       case State.Start       => Call("GET", "/start")
       case State.Continue(_) => Call("GET", "/continue")
       case State.Stop(_)     => Call("GET", "/stop")
+      case State.DeadEnd(_)  => Call("GET", "/dead-end")
     }
 
   /** implement this to render state after transition or when form validation fails */
@@ -115,8 +129,9 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
     state match {
       case State.Start =>
         Ok(Html(s"""Start | <a href="${backLinkFor(breadcrumbs).url}">back</a>"""))
-      case State.Continue(arg) => Ok(s"Continue with $arg and form ${formWithErrors.or(ArgForm)}")
-      case State.Stop(result)  => Ok(s"Result is $result")
+      case State.Continue(arg)   => Ok(s"Continue with $arg and form ${formWithErrors.or(ArgForm)}")
+      case State.Stop(result)    => Ok(s"Result is $result")
+      case State.DeadEnd(result) => Ok(s"Dead end: $result")
     }
 }
 

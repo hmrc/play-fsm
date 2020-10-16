@@ -22,8 +22,6 @@ import play.api.mvc._
 import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
-import scala.util.Success
-import akka.actor.FSM.Transition
 
 /**
   * Controller mixin for journeys implementing Finite State Machine.
@@ -47,18 +45,18 @@ trait JourneyController[RequestContext] {
   // EXTENSION POINTS
   //-------------------------------------------------
 
-  /** implement to map states into endpoints for redirection and back linking */
+  /** Implement to map states into endpoints for redirection and back linking */
   def getCallFor(state: State)(implicit request: Request[_]): Call
 
-  /** implement to render state after transition or when form validation fails */
+  /** Implement to render state after transition or when form validation fails */
   def renderState(state: State, breadcrumbs: Breadcrumbs, formWithErrors: Option[Form[_]])(implicit
     request: Request[_]
   ): Result
 
-  /** implement to provide customized request context you require in the service layer * */
+  /** Implement to provide customized request context you require in the service layer * */
   def context(implicit rh: RequestHeader): RequestContext
 
-  /** interceptor: override to do basic checks on every incoming request (headers, session, etc.) */
+  /** Interceptor: override to do basic checks on every incoming request (headers, session, etc.) */
   def withValidRequest(
     body: => Future[Result]
   )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
@@ -67,20 +65,26 @@ trait JourneyController[RequestContext] {
   type Route        = Request[_] => Result
   type RouteFactory = StateAndBreadcrumbs => Route
 
-  /** displays template for the state and breadcrumbs, eventually override to change details */
+  /** Displays template for the state and breadcrumbs, eventually override to change details */
   val display: RouteFactory = (state: StateAndBreadcrumbs) =>
     (request: Request[_]) => renderState(state._1, state._2, None)(request)
 
-  /** redirects to the endpoint matching state, eventually override to change details */
+  /** Redirects to the endpoint matching state, eventually override to change details */
   val redirect: RouteFactory =
     (state: StateAndBreadcrumbs) =>
       (request: Request[_]) => Results.Redirect(getCallFor(state._1)(request))
 
+  /** Returns a call to the previous state */
+  protected def backLinkFor(breadcrumbs: Breadcrumbs)(implicit request: Request[_]): Call =
+    breadcrumbs.headOption.map(getCallFor).getOrElse(getCallFor(journeyService.model.root))
+
   //-------------------------------------------------
-  // HELPERS
+  // TRANSITION HELPERS
   //-------------------------------------------------
 
-  /** applies transition to the current state */
+  /**
+    * Apply state transition and redirect to the URL matching the new state.
+    */
   protected final def apply(transition: Transition, routeFactory: RouteFactory)(implicit
     rc: RequestContext,
     request: Request[_],
@@ -95,58 +99,215 @@ trait JourneyController[RequestContext] {
           routeFactory((origin, breadcrumbs))(request) // renders current state back
       }
 
-  /** gets call to the previous state */
-  protected def backLinkFor(breadcrumbs: Breadcrumbs)(implicit request: Request[_]): Call =
-    breadcrumbs.headOption.map(getCallFor).getOrElse(getCallFor(journeyService.model.root))
-
-  /** action for a given async result function */
-  protected final def action(
-    body: Request[_] => Future[Result]
-  )(implicit ec: ExecutionContext): Action[AnyContent] =
-    Action.async { implicit request =>
-      implicit val rc: RequestContext = context(request)
-      withValidRequest(body(request))
-    }
-
-  type WithAuthorised[User] = Request[_] => (User => Future[Result]) => Future[Result]
-
-  /** applies transition parametrized by an authorised user */
-  protected final def whenAuthorised[User](
-    withAuthorised: WithAuthorised[User]
-  )(transition: User => Transition)(
-    routeFactory: RouteFactory
-  )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
-    withAuthorised(request) { user: User =>
-      apply(transition(user), routeFactory)
-    }
-
-  /** applies transition parametrized by an authorised user and form output */
-  protected final def whenAuthorisedWithForm[User, Payload](
-    withAuthorised: WithAuthorised[User]
-  )(form: Form[Payload])(
-    transition: User => Payload => Transition
-  )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
-    withAuthorised(request) { user: User =>
-      bindForm(form, transition(user))
-    }
-
-  /** applies 2 transitions in order:
-    * - first transition as provided
-    * - second transition parametrized by an authorised user and form output
+  /**
+    * Apply state transition and, depending on the outcome,
+    * display if the new state matches expectations,
+    * or redirect to the URL matching the new state.
     */
-  protected final def whenAuthorisedWithBootstrapAndForm[User, Payload, T](
-    bootstrap: Transition
-  )(withAuthorised: WithAuthorised[User])(form: Form[Payload])(
-    transition: User => Payload => Transition
+  protected final def applyAndMatch(transition: Transition)(
+    expectedStates: ExpectedStates
+  )(implicit
+    rc: RequestContext,
+    request: Request[_],
+    ec: ExecutionContext
+  ): Future[Result] =
+    journeyService
+      .apply(transition)
+      .map {
+        case sb @ (state, breadcrumbs) =>
+          if (expectedStates.isDefinedAt(state)) display(sb)
+          else redirect(sb)
+      }
+      .map(_(request))
+      .recover {
+        case TransitionNotAllowed(origin, breadcrumbs, _) =>
+          // renders current state back
+          if (expectedStates.isDefinedAt(origin))
+            display((origin, breadcrumbs))(request)
+          else
+            redirect((origin, breadcrumbs))(request)
+      }
+
+  /** Default fallback result is to redirect back to the Start state. */
+  private def redirectToStart(implicit
+    rc: RequestContext,
+    request: Request[_],
+    ec: ExecutionContext
+  ): Future[Result] = apply(journeyService.model.start, redirect)
+
+  //-------------------------------------------------
+  // STATE RENDERING HELPERS
+  //-------------------------------------------------
+
+  type ExpectedStates = PartialFunction[State, Unit]
+
+  /**
+    * Display the state requested by the type parameter S.
+    * If the current state is not of type S,
+    * try to rewind the history back to the nearest state matching S,
+    * or redirect back to the root state.
+    * @tparam S type of the state to display
+    */
+  protected final def showState(
+    expectedStates: ExpectedStates
   )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
-    withAuthorised(request) { user: User =>
-      journeyService
-        .apply(bootstrap)
-        .flatMap(_ => bindForm(form, transition(user)))
+    for {
+      stateAndBreadcrumbsOpt <- journeyService.currentState
+      result <- stateAndBreadcrumbsOpt match {
+                  case None => redirectToStart
+                  case Some(stateAndBreadcrumbs) =>
+                    if (hasState(expectedStates, stateAndBreadcrumbs))
+                      journeyService.currentState
+                        .flatMap(rewindTo(expectedStates)(redirectToStart))
+                    else redirectToStart
+                }
+    } yield result
+
+  /**
+    * Display the state requested by the type parameter S.
+    * If the current state is not of type S
+    * try to rewind the history back to the nearest state matching S
+    * and apply merge function to reconcile the new state with the previous state,
+    * or redirect back to the root state.
+    */
+  protected final def showStateUsingMerge[S <: State: ClassTag](
+    expectedStates: ExpectedStates
+  )(
+    merger: Merger[S]
+  )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
+    for {
+      stateAndBreadcrumbsOpt <- journeyService.currentState
+      result <- stateAndBreadcrumbsOpt match {
+                  case None => redirectToStart
+                  case sb @ Some((state, breadcrumbs)) =>
+                    if (hasState(expectedStates, (state, breadcrumbs)))
+                      rewindAndModify[S](expectedStates)(merger.withState(state))(redirectToStart)(
+                        sb
+                      )
+                    else redirectToStart
+                }
+    } yield result
+
+  /**
+    * Display the journey state requested by the type parameter S.
+    * If the current state is not of type S,
+    * try to rewind the history back to the nearest state matching S,
+    * If there exists no matching state S in the history,
+    * apply the transition and redirect to the new state.
+    * If transition is not allowed then redirect back to the current state.
+    * @tparam S type of the state to display
+    */
+  protected final def showStateOrApply(
+    expectedStates: ExpectedStates
+  )(
+    transition: Transition
+  )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
+    for {
+      stateAndBreadcrumbsOpt <- journeyService.currentState
+      result <- stateAndBreadcrumbsOpt match {
+                  case None => applyAndMatch(transition)(expectedStates)
+                  case sb @ Some(stateAndBreadcrumbs) =>
+                    if (hasState(expectedStates, stateAndBreadcrumbs))
+                      rewindTo(expectedStates)(applyAndMatch(transition)(expectedStates))(sb)
+                    else applyAndMatch(transition)(expectedStates)
+                }
+    } yield result
+
+  /**
+    * Display the journey state requested by the type parameter S.
+    * If the current state is not of type S,
+    * try to rewind the history back to the nearest state matching S
+    * and apply merge function to reconcile the new state with the current state.
+    * If there exists no matching state S in the history,
+    * apply the transition and redirect to the new state.
+    * If transition is not allowed then redirect back to the current state.
+    * @tparam S type of the state to display
+    */
+  protected final def showStateUsingMergeOrApply[S <: State: ClassTag](
+    expectedStates: ExpectedStates
+  )(
+    merger: Merger[S]
+  )(
+    transition: Transition
+  )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
+    for {
+      stateAndBreadcrumbsOpt <- journeyService.currentState
+      result <- stateAndBreadcrumbsOpt match {
+                  case None => applyAndMatch(transition)(expectedStates)
+                  case sb @ Some((state, breadcrumbs)) =>
+                    if (hasState(expectedStates, (state, breadcrumbs)))
+                      rewindAndModify[S](expectedStates)(merger.withState(state))(
+                        applyAndMatch(transition)(expectedStates)
+                      )(
+                        sb
+                      )
+                    else applyAndMatch(transition)(expectedStates)
+                }
+    } yield result
+
+  /** Check if the expected state exists in the journey history (breadcrumbs). */
+  @tailrec
+  protected final def hasState(
+    filter: PartialFunction[State, Unit],
+    stateAndBreadcrumbs: StateAndBreadcrumbs
+  ): Boolean =
+    stateAndBreadcrumbs match {
+      case (state, breadcrumbs) =>
+        if (filter.isDefinedAt(state)) true
+        else
+          breadcrumbs match {
+            case Nil    => false
+            case s :: b => hasState(filter, (s, b))
+          }
     }
 
-  /** binds form and applies transition parametrized by its outcome if success,
-    * otherwise redirects to the current state with form errors in flash scope
+  /** Rewind journey state and history (breadcrumbs) back to the nearest state matching expectations. */
+  protected final def rewindTo(expectedState: PartialFunction[State, Unit])(
+    fallback: => Future[Result]
+  )(
+    stateAndBreadcrumbsOpt: Option[StateAndBreadcrumbs]
+  )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
+    stateAndBreadcrumbsOpt match {
+      case None => fallback
+      case Some((state, breadcrumbs)) =>
+        if (expectedState.isDefinedAt(state))
+          Future.successful(renderState(state, breadcrumbs, None)(request))
+        else journeyService.stepBack.flatMap(rewindTo(expectedState)(fallback))
+    }
+
+  /**
+    * Rewind journey state and history (breadcrumbs) back to the nearest state matching expectations,
+    * and if exists, apply modification.
+    */
+  private final def rewindAndModify[S <: State: ClassTag](
+    expectedState: PartialFunction[State, Unit]
+  )(modification: S => S)(
+    fallback: => Future[Result]
+  )(
+    stateAndBreadcrumbsOpt: Option[StateAndBreadcrumbs]
+  )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
+    stateAndBreadcrumbsOpt match {
+      case None => fallback
+      case Some((state, breadcrumbs)) =>
+        if (expectedState.isDefinedAt(state))
+          journeyService
+            .modify(modification)
+            .map {
+              case (s, b) if implicitly[ClassTag[S]].runtimeClass.isAssignableFrom(s.getClass) =>
+                display((s, b))
+              case other => redirect(other)
+            }
+            .map(_(request))
+        else journeyService.stepBack.flatMap(rewindAndModify(expectedState)(modification)(fallback))
+    }
+
+  //-------------------------------------------------
+  // FORM BINDING HELPERS
+  //-------------------------------------------------
+
+  /**
+    * Bind form and apply transition if success,
+    * otherwise redirect to the current state with form errors in the flash scope.
     */
   protected final def bindForm[T](form: Form[T], transition: T => Transition)(implicit
     rc: RequestContext,
@@ -169,91 +330,53 @@ trait JourneyController[RequestContext] {
                   })
               )
             case None =>
-              apply(journeyService.model.start, redirect)
+              redirectToStart
           },
         userInput => apply(transition(userInput), redirect)
       )
 
-  type ExpectedStates = PartialFunction[State, Unit]
+  //-------------------------------------------------
+  // USER AUTHORIZATION HELPERS
+  //-------------------------------------------------
 
-  /** action rendering current state or rewinding to the previous state matching expectation */
-  protected final def actionShowState(
-    expectedStates: ExpectedStates
-  )(implicit ec: ExecutionContext): Action[AnyContent] =
-    action { implicit request =>
-      implicit val rc: RequestContext = context(request)
-      showState(expectedStates)
-    }
+  type WithAuthorised[User] = Request[_] => (User => Future[Result]) => Future[Result]
 
-  /** renders current state or rewinds to the previous state matching expectation */
-  protected final def showState(
-    expectedStates: ExpectedStates
-  )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
-    for {
-      stateAndBreadcrumbsOpt <- journeyService.currentState
-      result <- stateAndBreadcrumbsOpt match {
-                  case None => apply(journeyService.model.start, redirect)
-                  case Some(stateAndBreadcrumbs) =>
-                    if (hasState(expectedStates, stateAndBreadcrumbs))
-                      journeyService.currentState
-                        .flatMap(rewindTo(expectedStates))
-                    else apply(journeyService.model.start, redirect)
-                }
-    } yield result
-
-  /** renders current state or rewinds to the previous state matching expectation */
-  protected final def showStateUsingMerge[S <: State: ClassTag](
-    expectedStates: ExpectedStates
-  )(
-    merge: Merger[S]
-  )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
-    for {
-      stateAndBreadcrumbsOpt <- journeyService.currentState
-      result <- stateAndBreadcrumbsOpt match {
-                  case None => apply(journeyService.model.start, redirect)
-                  case Some(stateAndBreadcrumbs) =>
-                    if (hasState(expectedStates, stateAndBreadcrumbs))
-                      journeyService.currentState
-                        .flatMap {
-                          case sb @ Some((state, breadcrumbs)) =>
-                            val modification: S => S = { s: S =>
-                              if (merge.apply.isDefinedAt((s, state))) merge.apply((s, state))
-                              else s
-                            }
-                            rewindAndModify[S](expectedStates)(modification)(sb)
-                          case None => apply(journeyService.model.start, redirect)
-                        }
-                    else apply(journeyService.model.start, redirect)
-                }
-    } yield result
-
-  /** renders current state or applies transition */
-  protected final def showStateOrApply(
-    expectedStates: ExpectedStates
-  )(
-    transition: Transition
-  )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
-    for {
-      stateAndBreadcrumbsOpt <- journeyService.currentState
-      result <- stateAndBreadcrumbsOpt match {
-                  case None => apply(journeyService.model.start, redirect)
-                  case Some((state, breadcrumbs)) =>
-                    if (expectedStates.isDefinedAt(state))
-                      Future.successful(renderState(state, breadcrumbs, None)(request))
-                    else apply(transition, redirect)
-                }
-    } yield result
-
-  /** action rendering current state or rewinding to the previous state matching expectation */
-  protected final def actionShowStateWhenAuthorised[User](
+  /** Apply transition parametrized by an authorised user data. */
+  protected final def whenAuthorised[User](
     withAuthorised: WithAuthorised[User]
-  )(expectedStates: ExpectedStates)(implicit ec: ExecutionContext): Action[AnyContent] =
-    action { implicit request =>
-      implicit val rc: RequestContext = context(request)
-      showStateWhenAuthorised(withAuthorised)(expectedStates)
+  )(transition: User => Transition)(
+    routeFactory: RouteFactory
+  )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
+    withAuthorised(request) { user: User =>
+      apply(transition(user), routeFactory)
     }
 
-  /** when user authorized then render current state or rewinds to the previous state matching expectation */
+  /** Apply transition parametrized by an authorised user data and form output. */
+  protected final def whenAuthorisedWithForm[User, Payload](
+    withAuthorised: WithAuthorised[User]
+  )(form: Form[Payload])(
+    transition: User => Payload => Transition
+  )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
+    withAuthorised(request) { user: User =>
+      bindForm(form, transition(user))
+    }
+
+  /** Apply two transitions in order:
+    * - first: simple transition
+    * - second: transition parametrized by an authorised user data and form output
+    */
+  protected final def whenAuthorisedWithBootstrapAndForm[User, Payload, T](
+    bootstrap: Transition
+  )(withAuthorised: WithAuthorised[User])(form: Form[Payload])(
+    transition: User => Payload => Transition
+  )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
+    withAuthorised(request) { user: User =>
+      journeyService
+        .apply(bootstrap)
+        .flatMap(_ => bindForm(form, transition(user)))
+    }
+
+  /** When user is authorized then render current state or rewind to the previous state matching expectation. */
   protected final def showStateWhenAuthorised[User](withAuthorised: WithAuthorised[User])(
     expectedStates: ExpectedStates
   )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
@@ -272,61 +395,18 @@ trait JourneyController[RequestContext] {
       showStateUsingMerge(expectedStates)(merge)
     }
 
-  /** checks if some expected state can be found in journey history (breadcrumbs) */
-  @tailrec
-  protected final def hasState(
-    filter: PartialFunction[State, Unit],
-    stateAndBreadcrumbs: StateAndBreadcrumbs
-  ): Boolean =
-    stateAndBreadcrumbs match {
-      case (state, breadcrumbs) =>
-        if (filter.isDefinedAt(state)) true
-        else
-          breadcrumbs match {
-            case Nil    => false
-            case s :: b => hasState(filter, (s, b))
-          }
-    }
-
-  /** rewinds journey state and history (breadcrumbs) back to the latest expected state */
-  protected final def rewindTo(expectedState: PartialFunction[State, Unit])(
-    stateAndBreadcrumbsOpt: Option[StateAndBreadcrumbs]
-  )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
-    stateAndBreadcrumbsOpt match {
-      case None => apply(journeyService.model.start, redirect)
-      case Some((state, breadcrumbs)) =>
-        if (expectedState.isDefinedAt(state))
-          Future.successful(renderState(state, breadcrumbs, None)(request))
-        else journeyService.stepBack.flatMap(rewindTo(expectedState))
-    }
-
-  /**
-    * Rewinds journey state and history (breadcrumbs) back to the nearest expected state,
-    * and then eventually modifies it.
-    */
-  private final def rewindAndModify[S <: State: ClassTag](
-    expectedState: PartialFunction[State, Unit]
-  )(modification: S => S)(
-    stateAndBreadcrumbsOpt: Option[StateAndBreadcrumbs]
-  )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
-    stateAndBreadcrumbsOpt match {
-      case None => apply(journeyService.model.start, redirect)
-      case Some((state, breadcrumbs)) =>
-        if (expectedState.isDefinedAt(state))
-          journeyService
-            .modify(modification)
-            .map {
-              case (s, b) if implicitly[ClassTag[S]].runtimeClass.isAssignableFrom(s.getClass) =>
-                display((s, b))
-              case other => redirect(other)
-            }
-            .map(_(request))
-        else journeyService.stepBack.flatMap(rewindAndModify(expectedState)(modification))
-    }
-
   // ---------------------------------------
-  //  DSL
+  //  ACTIONS DSL
   // ---------------------------------------
+
+  /** Creates an action for a given async result function. */
+  protected final def action(
+    body: Request[_] => Future[Result]
+  )(implicit ec: ExecutionContext): Action[AnyContent] =
+    Action.async { implicit request =>
+      implicit val rc: RequestContext = context(request)
+      withValidRequest(body(request))
+    }
 
   /** Interface of Action building components */
   sealed trait Executable {
@@ -336,10 +416,11 @@ trait JourneyController[RequestContext] {
       val outer = this
       new Executable {
         def execute(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
-          outer.execute.andThen {
+          outer.execute.flatMap { result =>
             // clears journey history
-            case Success(_) =>
-              journeyService.cleanBreadcrumbs(_ => Nil)(context(request), ec)
+            journeyService
+              .cleanBreadcrumbs(_ => Nil)(context(request), ec)
+              .map(_ => result)
           }
       }
     }
@@ -356,7 +437,7 @@ trait JourneyController[RequestContext] {
     /**
       * Display the state requested by the type parameter S.
       * If the current state is not of type S,
-      * then rewind history back to the nearest state matching S,
+      * try to rewind the history back to the nearest state matching S,
       * or redirect back to the root state.
       * @tparam S type of the state to display
       */
@@ -371,7 +452,9 @@ trait JourneyController[RequestContext] {
       /**
         * Display the journey state requested by the type parameter S.
         * If the current state is not of type S,
-        * then apply the transition and redirect to the new state.
+        * try to rewind the history back to the nearest state matching S,
+        * If there exists no matching state S in the history,
+        * apply the transition and redirect to the new state.
         * If transition is not allowed then redirect back to the current state.
         * @tparam S type of the state to display
         */
@@ -386,9 +469,9 @@ trait JourneyController[RequestContext] {
 
       /**
         * Display the state requested by the type parameter S.
-        * If the current state is not of type S,
-        * then try to rewind history back to the nearest state matching S
-        * and apply merge function to reconcile the new state with the outgoing,
+        * If the current state is not of type S
+        * try to rewind the history back to the nearest state matching S
+        * and apply merge function to reconcile the new state with the previous state,
         * or redirect back to the root state.
         */
       def using(merger: Merger[S]): UsingMerger = new UsingMerger(merger)
@@ -400,6 +483,28 @@ trait JourneyController[RequestContext] {
         ): Future[Result] = {
           implicit val rc: RequestContext = JourneyController.this.context(request)
           JourneyController.this.showStateUsingMerge[S] { case _: S => }(merger)
+        }
+
+        /**
+          * Display the journey state requested by the type parameter S.
+          * If the current state is not of type S,
+          * try to rewind the history back to the nearest state matching S
+          * and apply merge function to reconcile the new state with the current state.
+          * If there exists no matching state S in the history,
+          * apply the transition and redirect to the new state.
+          * If transition is not allowed then redirect back to the current state.
+          * @tparam S type of the state to display
+          */
+        def orApply(transition: Transition): OrApply = new OrApply(transition)
+
+        class OrApply private[actions] (transition: Transition) extends Executable {
+          override def execute(implicit
+            request: Request[_],
+            ec: ExecutionContext
+          ): Future[Result] = {
+            implicit val rc: RequestContext = JourneyController.this.context(request)
+            JourneyController.this.showStateUsingMergeOrApply { case _: S => }(merger)(transition)
+          }
         }
       }
     }
@@ -452,7 +557,7 @@ trait JourneyController[RequestContext] {
       /**
         * Display the state requested by the type parameter S.
         * If the current state is not of type S,
-        * then rewind history back to the nearest state matching S,
+        * try to rewind the history back to the nearest state matching S,
         * or redirect back to the root state.
         * @tparam S type of the state to display
         */
@@ -465,9 +570,11 @@ trait JourneyController[RequestContext] {
         }
 
         /**
-          * Display the state requested by the type parameter S.
+          * Display the journey state requested by the type parameter S.
           * If the current state is not of type S,
-          * then apply the transition and redirect to the new state.
+          * try to rewind the history back to the nearest state matching S,
+          * If there exists no matching state S in the history,
+          * apply the transition and redirect to the new state.
           * If transition is not allowed then redirect back to the current state.
           * @tparam S type of the state to display
           */
@@ -494,14 +601,40 @@ trait JourneyController[RequestContext] {
           */
         def using(merge: Merger[S]): UsingMerger = new UsingMerger(merge)
 
-        class UsingMerger private[actions] (merge: Merger[S]) extends Executable {
+        class UsingMerger private[actions] (merger: Merger[S]) extends Executable {
           override def execute(implicit
             request: Request[_],
             ec: ExecutionContext
           ): Future[Result] = {
             implicit val rc: RequestContext = JourneyController.this.context(request)
             withAuthorised(request) { user: User =>
-              JourneyController.this.showStateUsingMerge[S] { case _: S => }(merge)
+              JourneyController.this.showStateUsingMerge[S] { case _: S => }(merger)
+            }
+          }
+
+          /**
+            * Display the journey state requested by the type parameter S.
+            * If the current state is not of type S,
+            * try to rewind the history back to the nearest state matching S
+            * and apply merge function to reconcile the new state with the current state.
+            * If there exists no matching state S in the history,
+            * apply the transition and redirect to the new state.
+            * If transition is not allowed then redirect back to the current state.
+            * @tparam S type of the state to display
+            */
+          def orApply(transition: User => Transition): OrApply = new OrApply(transition)
+
+          class OrApply private[actions] (transition: User => Transition) extends Executable {
+            override def execute(implicit
+              request: Request[_],
+              ec: ExecutionContext
+            ): Future[Result] = {
+              implicit val rc: RequestContext = JourneyController.this.context(request)
+              withAuthorised(request) { user: User =>
+                JourneyController.this.showStateUsingMergeOrApply { case _: S => }(merger)(
+                  transition(user)
+                )
+              }
             }
           }
         }
@@ -549,4 +682,30 @@ trait JourneyController[RequestContext] {
       }
     }
   }
+
+  //-------------------------------------------------
+  // DEPRECATED STUFF
+  //-------------------------------------------------
+
+  /**
+    * Prefer to use DSL {{{actions.show[ExpectedState]}}}
+    */
+  protected final def actionShowState(
+    expectedStates: ExpectedStates
+  )(implicit ec: ExecutionContext): Action[AnyContent] =
+    action { implicit request =>
+      implicit val rc: RequestContext = context(request)
+      showState(expectedStates)
+    }
+
+  /**
+    * Prefer to use DSL {{{actions.whenAuthorised(withAuthorised).show[ExpectedState]}}}
+    */
+  protected final def actionShowStateWhenAuthorised[User](
+    withAuthorised: WithAuthorised[User]
+  )(expectedStates: ExpectedStates)(implicit ec: ExecutionContext): Action[AnyContent] =
+    action { implicit request =>
+      implicit val rc: RequestContext = context(request)
+      showStateWhenAuthorised(withAuthorised)(expectedStates)
+    }
 }
