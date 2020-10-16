@@ -150,7 +150,7 @@ class DummyJourneyWithIdControllerSpec
       journeyState.set(State.Stop("dummy"), Nil)
       val result = controller.showContinue(fakeRequest)
       status(result) shouldBe 303
-      journeyState.get should have[State](State.Start, List(State.Stop("dummy")))
+      journeyState.get should have[State](State.Start, Nil)
     }
 
     "after POST /stop transition to Stop when in Start" in {

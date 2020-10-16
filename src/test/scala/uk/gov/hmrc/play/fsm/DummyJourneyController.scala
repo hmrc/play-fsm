@@ -109,6 +109,12 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
       .using(Mergers.toDeadEnd)
       .orApply(user => Transitions.toDeadEnd)
 
+  val showDeadEndDsl3: Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .show[State.DeadEnd]
+      .using(Mergers.toDeadEnd)
+
   // VIEWS
 
   /** implement this to map states into endpoints for redirection and back linking */
