@@ -133,7 +133,13 @@ trait JourneyController[RequestContext] {
     rc: RequestContext,
     request: Request[_],
     ec: ExecutionContext
-  ): Future[Result] = apply(journeyService.model.start, redirect)
+  ): Future[Result] =
+    apply(journeyService.model.start, redirect)
+      .flatMap(result =>
+        journeyService
+          .cleanBreadcrumbs(_ => Nil)
+          .map(_ => result)
+      )
 
   //-------------------------------------------------
   // STATE RENDERING HELPERS
