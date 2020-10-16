@@ -22,6 +22,7 @@ object DummyJourneyModel extends JourneyModel {
 
   object State {
     case object Start extends State
+    case class DeadEnd(msg: String) extends State
     case class Continue(arg: String) extends State
     case class Stop(result: String) extends State
   }
@@ -35,6 +36,7 @@ object DummyJourneyModel extends JourneyModel {
 
     def showContinue(user: Int) =
       Transition {
+        case Start      => goto(Continue("yummy"))
         case Stop(curr) => goto(Continue(curr.reverse))
       }
 
@@ -49,6 +51,12 @@ object DummyJourneyModel extends JourneyModel {
         case Start          => goto(Stop(""))
         case Continue(curr) => goto(Stop(curr))
       }
+
+    def toDeadEnd =
+      Transition {
+        case State.Continue("stop") => goto(State.Stop("continue"))
+        case _                      => goto(DeadEnd("empty"))
+      }
   }
 
   object Mergers {
@@ -61,6 +69,11 @@ object DummyJourneyModel extends JourneyModel {
     def toContinue =
       Merger[State.Continue] {
         case (state, State.Stop(curr)) => state.copy(arg = curr + "_" + curr)
+      }
+
+    def toDeadEnd =
+      Merger[State.DeadEnd] {
+        case (state, State.Continue(curr)) => State.DeadEnd(curr)
       }
 
   }

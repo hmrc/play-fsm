@@ -243,7 +243,7 @@ Inside your `XYZController extends JourneyController[MyContext]` implement:
 
 ### Controller patterns
 
-- render the state matching the pattern (type), eventually rolling history back
+- render the state matching the pattern (type), eventually rolling the history back
 
 ```
     val showStart: Action[AnyContent] = actions.show[State.Start.type]
@@ -255,7 +255,7 @@ or
       }
 ```
 
-- render the state matching the pattern (type), eventually rolling history back and merging historic state with the current one
+- render the state matching the pattern (type), eventually rolling the history back and merging historic state with the current one
 
 ```
     val showStart: Action[AnyContent] = actions
@@ -263,11 +263,20 @@ or
         .using(Mergers.toStart)
 ```
 
-- render the current state if matches the pattern (type), otherwise apply the transition and redirect to the resulting state
+- render the current state if matches the pattern (type), eventually rolling the history back, otherwise apply the transition and display/redirect to the resulting state
 
 ```
     val showStart: Action[AnyContent] = actions
         .show[State.Start.type]
+        .orApply(Transitions.start)
+```
+
+- render the current state if matches the pattern (type), eventually rolling the history back and merging historic state with the current one, otherwise apply the transition and display/redirect to the resulting state
+
+```
+    val showStart: Action[AnyContent] = actions
+        .show[State.Start.type]
+        .using(Mergers.toStart)
         .orApply(Transitions.start)
 ```
 
@@ -283,7 +292,7 @@ or
       }
 ```
 
-- clear or refine journey history after transition (cleanBreadcrumbs)
+- clear or refine the journey history after transition (cleanBreadcrumbs)
 
 ```
     val showStart: Action[AnyContent] = actions.show[State.Start.type].andCleanBreadcrumbs()

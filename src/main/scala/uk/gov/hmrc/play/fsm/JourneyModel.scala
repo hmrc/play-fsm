@@ -27,11 +27,31 @@ trait JourneyModel {
 
   type State
 
-  class Transition private (val apply: PartialFunction[State, Future[State]])
+  final class Transition private (val apply: PartialFunction[State, Future[State]])
 
-  /** Transition builder */
+  /** Transition builder helper */
   protected object Transition {
     def apply(rules: PartialFunction[State, Future[State]]): Transition = new Transition(rules)
+  }
+
+  case class TransitionNotAllowed(state: State, breadcrumbs: List[State], transition: Transition)
+      extends Exception
+
+  final class Merger[S <: State] private (val apply: PartialFunction[(S, State), S]) {
+
+    /**
+      * Converts merger into modification
+      * by partially applying donor state parameter.
+      */
+    def withState(state: State): S => S = { s: S =>
+      if (apply.isDefinedAt((s, state))) apply((s, state))
+      else s
+    }
+  }
+
+  /** Merger builder helper */
+  protected object Merger {
+    def apply[S <: State](merge: PartialFunction[(S, State), S]): Merger[S] = new Merger(merge)
   }
 
   /** Where your journey starts by default */
@@ -47,14 +67,4 @@ trait JourneyModel {
 
   /** Fail the transition */
   final def fail[T](exception: Exception): Future[T] = Future.failed(exception)
-
-  case class TransitionNotAllowed(state: State, breadcrumbs: List[State], transition: Transition)
-      extends Exception
-
-  class Merger[S <: State] private (val apply: PartialFunction[(S, State), S])
-
-  /** Merger builder */
-  protected object Merger {
-    def apply[S <: State](merge: PartialFunction[(S, State), S]): Merger[S] = new Merger(merge)
-  }
 }

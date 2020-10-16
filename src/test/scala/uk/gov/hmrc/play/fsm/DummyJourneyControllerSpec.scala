@@ -247,13 +247,6 @@ class DummyJourneyControllerSpec
       journeyState.get should have[State](State.Continue("dummy"), List(State.Start))
     }
 
-    "dsl+apply: after GET /continue show Continue when in Continue" in {
-      journeyState.set(State.Continue("dummy"), List(State.Start))
-      val result = controller.showOrApplyContinueDsl(fakeRequest)
-      status(result) shouldBe 200
-      journeyState.get should have[State](State.Continue("dummy"), List(State.Start))
-    }
-
     "dsl+merge: after GET /continue show Continue when in Continue" in {
       journeyState.set(State.Continue("dummy"), List(State.Start))
       val result = controller.showContinueDsl2(fakeRequest)
@@ -275,13 +268,30 @@ class DummyJourneyControllerSpec
       journeyState.get should have[State](State.Continue("dummy"), List(State.Start))
     }
 
+    "dsl+apply: after GET /continue show new Continue when in Start" in {
+      journeyState.set(State.Start, Nil)
+      val result = controller.showOrApplyContinueDsl(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](
+        State.Continue("yummy"),
+        List(State.Start)
+      )
+    }
+
+    "dsl+apply: after GET /continue show Continue when in Continue" in {
+      journeyState.set(State.Continue("dummy"), List(State.Start))
+      val result = controller.showOrApplyContinueDsl(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](State.Continue("dummy"), List(State.Start))
+    }
+
     "dsl+apply: after GET /continue show new Continue when in Stop" in {
       journeyState.set(State.Stop("dummy"), List(State.Continue("dummy"), State.Start))
       val result = controller.showOrApplyContinueDsl(fakeRequest)
-      status(result) shouldBe 303
+      status(result) shouldBe 200
       journeyState.get should have[State](
-        State.Continue("ymmud"),
-        List(State.Stop("dummy"), State.Continue("dummy"), State.Start)
+        State.Continue("dummy"),
+        List(State.Start)
       )
     }
 
@@ -312,7 +322,7 @@ class DummyJourneyControllerSpec
     "dsl2: after GET /continue show new Continue when in Stop but no breadcrumbs" in {
       journeyState.set(State.Stop("dummy"), Nil)
       val result = controller.showOrApplyContinueDsl(fakeRequest)
-      status(result) shouldBe 303
+      status(result) shouldBe 200
       journeyState.get should have[State](State.Continue("ymmud"), List(State.Stop("dummy")))
     }
 
@@ -370,13 +380,6 @@ class DummyJourneyControllerSpec
       journeyState.get           should have[State](State.Stop("dummy"), List(State.Start))
     }
 
-    "after GET /stop show Stop when in Stop" in {
-      journeyState.set(State.Stop("dummy"), List(State.Start))
-      val result = controller.showStop(fakeRequest)
-      status(result) shouldBe 200
-      journeyState.get should have[State](State.Stop("dummy"), List(State.Start))
-    }
-
     "dsl+clean: after GET /stop show Stop when in Stop" in {
       journeyState.set(State.Stop("dummy"), List(State.Start))
       val result = controller.showStopDsl2(fakeRequest)
@@ -384,11 +387,126 @@ class DummyJourneyControllerSpec
       journeyState.get should have[State](State.Stop("dummy"), Nil)
     }
 
+    "after GET /stop show Stop when in Stop" in {
+      journeyState.set(State.Stop("dummy"), List(State.Start))
+      val result = controller.showStop(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](State.Stop("dummy"), List(State.Start))
+    }
+
     "dsl: after GET /stop show Stop when in Stop" in {
       journeyState.set(State.Stop("dummy"), List(State.Start))
       val result = controller.showStopDsl(fakeRequest)
       status(result) shouldBe 200
       journeyState.get should have[State](State.Stop("dummy"), List(State.Start))
+    }
+
+    "dsl: after GET /dead-end go to the new DeadEnd when in Start" in {
+      journeyState.set(State.Start, Nil)
+      val result = controller.showDeadEndDsl(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](State.DeadEnd("empty"), List(State.Start))
+    }
+
+    "dsl: after GET /dead-end show existing DeadEnd when in DeadEnd" in {
+      journeyState.set(State.DeadEnd("here"), List(State.Start))
+      val result = controller.showDeadEndDsl(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](State.DeadEnd("here"), List(State.Start))
+    }
+
+    "dsl: after GET /dead-end go to new empty DeadEnd when in Continue and not DeadEnd in history" in {
+      journeyState.set(State.Continue("mummy"), List(State.Start))
+      val result = controller.showDeadEndDsl(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](
+        State.DeadEnd("empty"),
+        List(State.Continue("mummy"), State.Start)
+      )
+    }
+
+    "dsl: after GET /dead-end go to Stop when in Continue(stop) and not DeadEnd in history" in {
+      journeyState.set(State.Continue("stop"), List(State.Start))
+      val result = controller.showDeadEndDsl(fakeRequest)
+      status(result) shouldBe 303
+      journeyState.get should have[State](
+        State.Stop("continue"),
+        List(State.Continue("stop"), State.Start)
+      )
+    }
+
+    "dsl: after GET /dead-end rollback to DeadEnd when in Continue and DeadEnd in history" in {
+      journeyState.set(State.Continue("mummy"), List(State.DeadEnd("empty"), State.Start))
+      val result = controller.showDeadEndDsl(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](
+        State.DeadEnd("mummy"),
+        List(State.Start)
+      )
+    }
+
+    "dsl: after GET /dead-end rollback to DeadEnd when in Continue(stop) and DeadEnd in history" in {
+      journeyState.set(State.Continue("stop"), List(State.DeadEnd("empty"), State.Start))
+      val result = controller.showDeadEndDsl(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](
+        State.DeadEnd("stop"),
+        List(State.Start)
+      )
+    }
+
+    "dsl2: after GET /dead-end go to the new DeadEnd when in Start" in {
+      journeyState.set(State.Start, Nil)
+      val result = controller.showDeadEndDsl2(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](State.DeadEnd("empty"), List(State.Start))
+    }
+
+    "dsl2: after GET /dead-end show existing DeadEnd when in DeadEnd" in {
+      journeyState.set(State.DeadEnd("here"), List(State.Start))
+      val result = controller.showDeadEndDsl2(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](State.DeadEnd("here"), List(State.Start))
+    }
+
+    "dsl2: after GET /dead-end go to new empty DeadEnd when in Continue and not DeadEnd in history" in {
+      journeyState.set(State.Continue("mummy"), List(State.Start))
+      val result = controller.showDeadEndDsl2(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](
+        State.DeadEnd("empty"),
+        List(State.Continue("mummy"), State.Start)
+      )
+    }
+
+    "dsl2: after GET /dead-end go to Stop when in Continue(stop) and not DeadEnd in history" in {
+      journeyState.set(State.Continue("stop"), List(State.Start))
+      val result = controller.showDeadEndDsl2(fakeRequest)
+      status(result) shouldBe 303
+      journeyState.get should have[State](
+        State.Stop("continue"),
+        List(State.Continue("stop"), State.Start)
+      )
+    }
+
+    "dsl2: after GET /dead-end rollback to DeadEnd when in Continue and DeadEnd in history" in {
+      journeyState.set(State.Continue("mummy"), List(State.DeadEnd("empty"), State.Start))
+      val result = controller.showDeadEndDsl2(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](
+        State.DeadEnd("mummy"),
+        List(State.Start)
+      )
+    }
+
+    "dsl2: after GET /dead-end rollback to DeadEnd when in Continue(stop) and DeadEnd in history" in {
+      journeyState.set(State.Continue("stop"), List(State.DeadEnd("empty"), State.Start))
+      val result = controller.showDeadEndDsl2(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](
+        State.DeadEnd("stop"),
+        List(State.Start)
+      )
     }
 
   }
