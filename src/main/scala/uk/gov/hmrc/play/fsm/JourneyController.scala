@@ -416,8 +416,10 @@ trait JourneyController[RequestContext] {
 
   /** Interface of Action building components */
   sealed trait Executable {
+
     def execute(implicit request: Request[_], ec: ExecutionContext): Future[Result]
 
+    /** Clean history (breadcrumbs) afterwards. */
     def andCleanBreadcrumbs(): Executable = {
       val outer = this
       new Executable {
