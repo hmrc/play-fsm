@@ -20,12 +20,23 @@ import play.api.data.Form
 import play.api.mvc.{Flash, Request}
 
 object OptionalFormOps {
-  implicit class OptionalForm(val formOpt: Option[Form[_]]) extends AnyVal {
-    def or[T](other: Form[T])(implicit request: Request[_]): Form[T] =
-      formOpt
+  implicit class OptionalForm(val formWithErrors: Option[Form[_]]) extends AnyVal {
+
+    /** Returns formWithErrors or an empty form. */
+    def or[T](emptyForm: Form[T])(implicit request: Request[_]): Form[T] =
+      formWithErrors
         .map(_.asInstanceOf[Form[T]])
         .getOrElse {
-          if (request.flash.isEmpty) other else other.bind(request.flash.data)
+          if (request.flash.isEmpty) emptyForm else emptyForm.bind(request.flash.data)
+        }
+
+    /** Returns formWithErrors or a pre-filled form, or an empty form. */
+    def or[T](emptyForm: Form[T], maybeFillWith: Option[T])(implicit request: Request[_]): Form[T] =
+      formWithErrors
+        .map(_.asInstanceOf[Form[T]])
+        .getOrElse {
+          if (request.flash.isEmpty) maybeFillWith.map(emptyForm.fill).getOrElse(emptyForm)
+          else emptyForm.bind(request.flash.data)
         }
   }
 }
