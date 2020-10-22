@@ -466,9 +466,29 @@ trait JourneyController[RequestContext] {
         * If transition is not allowed then redirect back to the current state.
         * @tparam S type of the state to display
         */
-      def orApply(transition: Request[_] => Transition): OrApply = new OrApply(transition)
+      def orApply(transition: Transition): OrApply = new OrApply(transition)
 
-      class OrApply private[actions] (transition: Request[_] => Transition) extends Executable {
+      class OrApply private[actions] (transition: Transition) extends Executable {
+        override def execute(implicit request: Request[_], ec: ExecutionContext): Future[Result] = {
+          implicit val rc: RequestContext = JourneyController.this.context(request)
+          JourneyController.this.showStateOrApply { case _: S => }(transition)
+        }
+      }
+
+      /**
+        * Display the journey state requested by the type parameter S.
+        * If the current state is not of type S,
+        * try to rewind the history back to the nearest state matching S,
+        * If there exists no matching state S in the history,
+        * apply the transition and redirect to the new state.
+        * If transition is not allowed then redirect back to the current state.
+        * @tparam S type of the state to display
+        */
+      def orApplyWithRequest(transition: Request[_] => Transition): OrApplyWithRequest =
+        new OrApplyWithRequest(transition)
+
+      class OrApplyWithRequest private[actions] (transition: Request[_] => Transition)
+          extends Executable {
         override def execute(implicit request: Request[_], ec: ExecutionContext): Future[Result] = {
           implicit val rc: RequestContext = JourneyController.this.context(request)
           JourneyController.this.showStateOrApply { case _: S => }(transition(request))
@@ -503,9 +523,35 @@ trait JourneyController[RequestContext] {
           * If transition is not allowed then redirect back to the current state.
           * @tparam S type of the state to display
           */
-        def orApply(transition: Request[_] => Transition): OrApply = new OrApply(transition)
+        def orApply(transition: Transition): OrApply = new OrApply(transition)
 
-        class OrApply private[actions] (transition: Request[_] => Transition) extends Executable {
+        class OrApply private[actions] (transition: Transition) extends Executable {
+          override def execute(implicit
+            request: Request[_],
+            ec: ExecutionContext
+          ): Future[Result] = {
+            implicit val rc: RequestContext = JourneyController.this.context(request)
+            JourneyController.this.showStateUsingMergeOrApply { case _: S => }(merger)(
+              transition
+            )
+          }
+        }
+
+        /**
+          * Display the journey state requested by the type parameter S.
+          * If the current state is not of type S,
+          * try to rewind the history back to the nearest state matching S
+          * and apply merge function to reconcile the new state with the current state.
+          * If there exists no matching state S in the history,
+          * apply the transition and redirect to the new state.
+          * If transition is not allowed then redirect back to the current state.
+          * @tparam S type of the state to display
+          */
+        def orApplyWithRequest(transition: Request[_] => Transition): OrApplyWithRequest =
+          new OrApplyWithRequest(transition)
+
+        class OrApplyWithRequest private[actions] (transition: Request[_] => Transition)
+            extends Executable {
           override def execute(implicit
             request: Request[_],
             ec: ExecutionContext
@@ -520,9 +566,21 @@ trait JourneyController[RequestContext] {
     }
 
     /** Apply state transition and redirect to the URL matching the new state. */
-    def apply(transition: Request[_] => Transition): Apply = new Apply(transition)
+    def apply(transition: Transition): Apply = new Apply(transition)
 
-    class Apply private[actions] (transition: Request[_] => Transition) extends Executable {
+    class Apply private[actions] (transition: Transition) extends Executable {
+      override def execute(implicit request: Request[_], ec: ExecutionContext): Future[Result] = {
+        implicit val rc: RequestContext = JourneyController.this.context(request)
+        JourneyController.this.apply(transition, JourneyController.this.redirect)
+      }
+    }
+
+    /** Apply state transition and redirect to the URL matching the new state. */
+    def applyWithRequest(transition: Request[_] => Transition): ApplyWithRequest =
+      new ApplyWithRequest(transition)
+
+    class ApplyWithRequest private[actions] (transition: Request[_] => Transition)
+        extends Executable {
       override def execute(implicit request: Request[_], ec: ExecutionContext): Future[Result] = {
         implicit val rc: RequestContext = JourneyController.this.context(request)
         JourneyController.this.apply(transition(request), JourneyController.this.redirect)
@@ -544,9 +602,23 @@ trait JourneyController[RequestContext] {
         * Apply state transition parametrized by the form output
         * and redirect to the URL matching the new state.
         */
-      def apply(transition: Request[_] => Payload => Transition): Apply = new Apply(transition)
+      def apply(transition: Payload => Transition): Apply = new Apply(transition)
 
-      class Apply private[actions] (transition: Request[_] => Payload => Transition)
+      class Apply private[actions] (transition: Payload => Transition) extends Executable {
+        override def execute(implicit request: Request[_], ec: ExecutionContext): Future[Result] = {
+          implicit val rc: RequestContext = JourneyController.this.context(request)
+          JourneyController.this.bindForm(form, transition)
+        }
+      }
+
+      /**
+        * Apply state transition parametrized by the form output
+        * and redirect to the URL matching the new state.
+        */
+      def applyWithRequest(transition: Request[_] => Payload => Transition): ApplyWithRequest =
+        new ApplyWithRequest(transition)
+
+      class ApplyWithRequest private[actions] (transition: Request[_] => Payload => Transition)
           extends Executable {
         override def execute(implicit request: Request[_], ec: ExecutionContext): Future[Result] = {
           implicit val rc: RequestContext = JourneyController.this.context(request)
@@ -589,9 +661,33 @@ trait JourneyController[RequestContext] {
           * If transition is not allowed then redirect back to the current state.
           * @tparam S type of the state to display
           */
-        def orApply(transition: Request[_] => User => Transition): OrApply = new OrApply(transition)
+        def orApply(transition: User => Transition): OrApply = new OrApply(transition)
 
-        class OrApply private[actions] (transition: Request[_] => User => Transition)
+        class OrApply private[actions] (transition: User => Transition) extends Executable {
+          override def execute(implicit
+            request: Request[_],
+            ec: ExecutionContext
+          ): Future[Result] = {
+            implicit val rc: RequestContext = JourneyController.this.context(request)
+            withAuthorised(request) { user: User =>
+              JourneyController.this.showStateOrApply { case _: S => }(transition(user))
+            }
+          }
+        }
+
+        /**
+          * Display the journey state requested by the type parameter S.
+          * If the current state is not of type S,
+          * try to rewind the history back to the nearest state matching S,
+          * If there exists no matching state S in the history,
+          * apply the transition and redirect to the new state.
+          * If transition is not allowed then redirect back to the current state.
+          * @tparam S type of the state to display
+          */
+        def orApplyWithRequest(transition: Request[_] => User => Transition): OrApplyWithRequest =
+          new OrApplyWithRequest(transition)
+
+        class OrApplyWithRequest private[actions] (transition: Request[_] => User => Transition)
             extends Executable {
           override def execute(implicit
             request: Request[_],
@@ -634,10 +730,37 @@ trait JourneyController[RequestContext] {
             * If transition is not allowed then redirect back to the current state.
             * @tparam S type of the state to display
             */
-          def orApply(transition: Request[_] => User => Transition): OrApply =
+          def orApply(transition: User => Transition): OrApply =
             new OrApply(transition)
 
-          class OrApply private[actions] (transition: Request[_] => User => Transition)
+          class OrApply private[actions] (transition: User => Transition) extends Executable {
+            override def execute(implicit
+              request: Request[_],
+              ec: ExecutionContext
+            ): Future[Result] = {
+              implicit val rc: RequestContext = JourneyController.this.context(request)
+              withAuthorised(request) { user: User =>
+                JourneyController.this.showStateUsingMergeOrApply { case _: S => }(merger)(
+                  transition(user)
+                )
+              }
+            }
+          }
+
+          /**
+            * Display the journey state requested by the type parameter S.
+            * If the current state is not of type S,
+            * try to rewind the history back to the nearest state matching S
+            * and apply merge function to reconcile the new state with the current state.
+            * If there exists no matching state S in the history,
+            * apply the transition and redirect to the new state.
+            * If transition is not allowed then redirect back to the current state.
+            * @tparam S type of the state to display
+            */
+          def orApplyWithRequest(transition: Request[_] => User => Transition): OrApplyWithRequest =
+            new OrApplyWithRequest(transition)
+
+          class OrApplyWithRequest private[actions] (transition: Request[_] => User => Transition)
               extends Executable {
             override def execute(implicit
               request: Request[_],
@@ -659,9 +782,24 @@ trait JourneyController[RequestContext] {
         * Apply state transition parametrized by the user information
         * and redirect to the URL matching the new state.
         */
-      def apply(transition: Request[_] => User => Transition): Apply = new Apply(transition)
+      def apply(transition: User => Transition): Apply = new Apply(transition)
 
-      class Apply private[actions] (transition: Request[_] => User => Transition)
+      class Apply private[actions] (transition: User => Transition) extends Executable {
+        override def execute(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+          withAuthorised(request) { user: User =>
+            implicit val rc: RequestContext = JourneyController.this.context(request)
+            JourneyController.this.apply(transition(user), JourneyController.this.redirect)
+          }
+      }
+
+      /**
+        * Apply state transition parametrized by the user information
+        * and redirect to the URL matching the new state.
+        */
+      def applyWithRequest(transition: Request[_] => User => Transition): ApplyWithRequest =
+        new ApplyWithRequest(transition)
+
+      class ApplyWithRequest private[actions] (transition: Request[_] => User => Transition)
           extends Executable {
         override def execute(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
           withAuthorised(request) { user: User =>
@@ -685,11 +823,30 @@ trait JourneyController[RequestContext] {
           * Apply state transition parametrized by the user information and form output
           * and redirect to the URL matching the end state.
           */
-        def apply(transition: Request[_] => User => Payload => Transition): Apply =
+        def apply(transition: User => Payload => Transition): Apply =
           new Apply(transition)
 
-        class Apply private[actions] (transition: Request[_] => User => Payload => Transition)
+        class Apply private[actions] (transition: User => Payload => Transition)
             extends Executable {
+          override def execute(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+            withAuthorised(request) { user: User =>
+              implicit val rc: RequestContext = JourneyController.this.context(request)
+              JourneyController.this.bindForm(form, transition(user))
+            }
+        }
+
+        /**
+          * Apply state transition parametrized by the user information and form output
+          * and redirect to the URL matching the end state.
+          */
+        def applyWithRequest(
+          transition: Request[_] => User => Payload => Transition
+        ): ApplyWithRequest =
+          new ApplyWithRequest(transition)
+
+        class ApplyWithRequest private[actions] (
+          transition: Request[_] => User => Payload => Transition
+        ) extends Executable {
           override def execute(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
             withAuthorised(request) { user: User =>
               implicit val rc: RequestContext = JourneyController.this.context(request)
