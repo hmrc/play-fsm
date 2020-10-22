@@ -268,7 +268,7 @@ or
 ```
     val showStart: Action[AnyContent] = actions
         .show[State.Start.type]
-        .orApply(_ => Transitions.start)
+        .orApply(Transitions.start)
 ```
 
 - render the current state if matches the pattern (type), eventually rolling the history back and merging historic state with the current one, otherwise apply the transition and display/redirect to the resulting state
@@ -277,7 +277,7 @@ or
     val showStart: Action[AnyContent] = actions
         .show[State.Start.type]
         .using(Mergers.toStart)
-        .orApply(_ => Transitions.start)
+        .orApply(Transitions.start)
 ```
 
 - apply the transition to current state and redirect to the resulting state
@@ -288,7 +288,7 @@ or
 or
 ```
     val stop: Action[AnyContent] = action { implicit request =>
-        apply(implicit request => Transitions.stop)(redirect)
+        apply(Transitions.stop)(redirect)
       }
 ```
 
@@ -353,7 +353,7 @@ or
 ```
     val stop: Action[AnyContent] = actions
         .whenAuthorised(asUser)
-        .apply(implicit request => Transitions.stop)
+        .apply(Transitions.stop)
 ```
 or
 ```
@@ -382,7 +382,7 @@ or
     val showContinue: Action[AnyContent] = actions
         .whenAuthorised(asUser)
         .show[State.Continue]
-        .orApply(_ => Transitions.continue)
+        .orApplyWithRequest(implicit request => Transitions.continue)
 ```
 
 - for an authorized user only, apply the transition to current state and redirect to the resulting state

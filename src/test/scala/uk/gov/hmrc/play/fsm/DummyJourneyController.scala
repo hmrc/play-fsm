@@ -66,7 +66,10 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
     }
 
   def continueDsl: Action[AnyContent] =
-    actions.whenAuthorised(asUser).bindForm(ArgForm).apply(_ => Transitions.continue)
+    actions.whenAuthorised(asUser).bindForm(ArgForm).apply(Transitions.continue)
+
+  def continueDsl2: Action[AnyContent] =
+    actions.whenAuthorised(asUser).bindForm(ArgForm).applyWithRequest(_ => Transitions.continue)
 
   val showContinue: Action[AnyContent] = actionShowStateWhenAuthorised(asUser) {
     case State.Continue(_) =>
@@ -79,13 +82,22 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
     actions.whenAuthorised(asUser).show[State.Continue].using(Mergers.toContinue)
 
   val showOrApplyContinueDsl: Action[AnyContent] =
-    actions.whenAuthorised(asUser).show[State.Continue].orApply(_ => Transitions.showContinue)
+    actions.whenAuthorised(asUser).show[State.Continue].orApply(Transitions.showContinue)
+
+  val showOrApplyContinueDsl2: Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .show[State.Continue]
+      .orApplyWithRequest(implicit request => Transitions.showContinue)
 
   val stop: Action[AnyContent] = action { implicit request =>
     whenAuthorised(asUser)(Transitions.stop)(redirect)
   }
 
-  val stopDsl: Action[AnyContent] = actions.whenAuthorised(asUser).apply(_ => Transitions.stop)
+  val stopDsl: Action[AnyContent] = actions.whenAuthorised(asUser).apply(Transitions.stop)
+
+  val stopDsl2: Action[AnyContent] =
+    actions.whenAuthorised(asUser).applyWithRequest(_ => Transitions.stop)
 
   val showStop: Action[AnyContent] = actionShowStateWhenAuthorised(asUser) {
     case State.Stop(_) =>
@@ -98,18 +110,33 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
 
   def dummyFx(s: String)(implicit dc: DummyContext): String = s
 
+  def dummyFx2(s: String): String = s
+
   val showDeadEndDsl: Action[AnyContent] =
     actions
       .show[State.DeadEnd]
       .using(Mergers.toDeadEnd)
-      .orApply(implicit request => Transitions.toDeadEnd(dummyFx))
+      .orApplyWithRequest(implicit request => Transitions.toDeadEnd(dummyFx))
+
+  val showDeadEndDsl1: Action[AnyContent] =
+    actions
+      .show[State.DeadEnd]
+      .using(Mergers.toDeadEnd)
+      .orApply(Transitions.toDeadEnd(dummyFx2))
 
   val showDeadEndDsl2: Action[AnyContent] =
     actions
       .whenAuthorised(asUser)
       .show[State.DeadEnd]
       .using(Mergers.toDeadEnd)
-      .orApply(implicit request => user => Transitions.toDeadEnd(dummyFx))
+      .orApplyWithRequest(implicit request => user => Transitions.toDeadEnd(dummyFx))
+
+  val showDeadEndDsl4: Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .show[State.DeadEnd]
+      .using(Mergers.toDeadEnd)
+      .orApply(user => Transitions.toDeadEnd(dummyFx2))
 
   val showDeadEndDsl3: Action[AnyContent] =
     actions
