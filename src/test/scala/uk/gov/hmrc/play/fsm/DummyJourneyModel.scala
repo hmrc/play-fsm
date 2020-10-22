@@ -52,10 +52,10 @@ object DummyJourneyModel extends JourneyModel {
         case Continue(curr) => goto(Stop(curr))
       }
 
-    def toDeadEnd =
+    def toDeadEnd(fx: String => String) =
       Transition {
-        case State.Continue("stop") => goto(State.Stop("continue"))
-        case _                      => goto(DeadEnd("empty"))
+        case State.Continue("stop") => goto(State.Stop(fx("continue")))
+        case _                      => goto(DeadEnd(fx("empty")))
       }
   }
 
