@@ -66,7 +66,7 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
     }
 
   def continueDsl: Action[AnyContent] =
-    actions.whenAuthorised(asUser).bindForm(ArgForm).apply(Transitions.continue)
+    actions.whenAuthorised(asUser).bindForm(ArgForm).apply(_ => Transitions.continue)
 
   val showContinue: Action[AnyContent] = actionShowStateWhenAuthorised(asUser) {
     case State.Continue(_) =>
@@ -79,13 +79,13 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
     actions.whenAuthorised(asUser).show[State.Continue].using(Mergers.toContinue)
 
   val showOrApplyContinueDsl: Action[AnyContent] =
-    actions.whenAuthorised(asUser).show[State.Continue].orApply(Transitions.showContinue)
+    actions.whenAuthorised(asUser).show[State.Continue].orApply(_ => Transitions.showContinue)
 
   val stop: Action[AnyContent] = action { implicit request =>
     whenAuthorised(asUser)(Transitions.stop)(redirect)
   }
 
-  val stopDsl: Action[AnyContent] = actions.whenAuthorised(asUser).apply(Transitions.stop)
+  val stopDsl: Action[AnyContent] = actions.whenAuthorised(asUser).apply(_ => Transitions.stop)
 
   val showStop: Action[AnyContent] = actionShowStateWhenAuthorised(asUser) {
     case State.Stop(_) =>
@@ -96,18 +96,20 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
   val showStopDsl2: Action[AnyContent] =
     actions.whenAuthorised(asUser).show[State.Stop].andCleanBreadcrumbs()
 
+  def dummyFx(s: String)(implicit dc: DummyContext): String = s
+
   val showDeadEndDsl: Action[AnyContent] =
     actions
       .show[State.DeadEnd]
       .using(Mergers.toDeadEnd)
-      .orApply(Transitions.toDeadEnd)
+      .orApply(implicit request => Transitions.toDeadEnd(dummyFx))
 
   val showDeadEndDsl2: Action[AnyContent] =
     actions
       .whenAuthorised(asUser)
       .show[State.DeadEnd]
       .using(Mergers.toDeadEnd)
-      .orApply(user => Transitions.toDeadEnd)
+      .orApply(implicit request => user => Transitions.toDeadEnd(dummyFx))
 
   val showDeadEndDsl3: Action[AnyContent] =
     actions
