@@ -346,6 +346,22 @@ class DummyJourneyControllerSpec
       journeyState.get           should have[State](State.Stop(""), List(State.Start))
     }
 
+    "dsl2: after POST /stop transition to Stop when in Start" in {
+      journeyState.set(State.Start, Nil)
+      val result = controller.stopDsl2(fakeRequest)
+      status(result)           shouldBe 303
+      redirectLocation(result) shouldBe Some("/stop")
+      journeyState.get           should have[State](State.Stop(""), List(State.Start))
+    }
+
+    "dsl3: after POST /stop transition to Stop when in Start" in {
+      journeyState.set(State.Start, Nil)
+      val result = controller.stopDsl3(fakeRequest)
+      status(result)           shouldBe 303
+      redirectLocation(result) shouldBe Some("/stop")
+      journeyState.get           should have[State](State.Stop(""), List(State.Start))
+    }
+
     "after POST /stop transition to Stop when in Continue" in {
       journeyState.set(State.Continue("dummy"), List(State.Start))
       val result = controller.stop(fakeRequest)
@@ -368,6 +384,28 @@ class DummyJourneyControllerSpec
       )
     }
 
+    "dsl2: after POST /stop transition to Stop when in Continue" in {
+      journeyState.set(State.Continue("dummy"), List(State.Start))
+      val result = controller.stopDsl2(fakeRequest)
+      status(result)           shouldBe 303
+      redirectLocation(result) shouldBe Some("/stop")
+      journeyState.get should have[State](
+        State.Stop("dummy"),
+        List(State.Continue("dummy"), State.Start)
+      )
+    }
+
+    "dsl3: after POST /stop transition to Stop when in Continue" in {
+      journeyState.set(State.Continue("dummy"), List(State.Start))
+      val result = controller.stopDsl3(fakeRequest)
+      status(result)           shouldBe 303
+      redirectLocation(result) shouldBe Some("/stop")
+      journeyState.get should have[State](
+        State.Stop("dummy"),
+        List(State.Continue("dummy"), State.Start)
+      )
+    }
+
     "after POST /stop stay in Stop when in Stop" in {
       journeyState.set(State.Stop("dummy"), List(State.Start))
       val result = controller.stop(fakeRequest)
@@ -382,6 +420,21 @@ class DummyJourneyControllerSpec
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/stop")
       journeyState.get           should have[State](State.Stop("dummy"), List(State.Start))
+    }
+
+    "dsl2: after POST /stop stay in Stop when in Stop" in {
+      journeyState.set(State.Stop("dummy"), List(State.Start))
+      val result = controller.stopDsl2(fakeRequest)
+      status(result)           shouldBe 303
+      redirectLocation(result) shouldBe Some("/stop")
+      journeyState.get           should have[State](State.Stop("dummy"), List(State.Start))
+    }
+
+    "dsl3: after POST /stop stay in Stop when in Stop" in {
+      journeyState.set(State.Stop("dummy"), List(State.Start))
+      val result = controller.stopDsl3(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](State.Stop("dummy"), List(State.Start))
     }
 
     "dsl+clean: after GET /stop show Stop when in Stop" in {
