@@ -99,6 +99,9 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
   val stopDsl2: Action[AnyContent] =
     actions.whenAuthorised(asUser).applyWithRequest(_ => Transitions.stop)
 
+  val stopDsl3: Action[AnyContent] =
+    actions.whenAuthorised(asUser).applyThenRedirectOrDisplay(_ => Transitions.stop)
+
   val showStop: Action[AnyContent] = actionShowStateWhenAuthorised(asUser) {
     case State.Stop(_) =>
   }

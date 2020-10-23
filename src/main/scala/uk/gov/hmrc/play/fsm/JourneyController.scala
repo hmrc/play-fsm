@@ -101,6 +101,43 @@ trait JourneyController[RequestContext] {
 
   /**
     * Apply state transition and, depending on the outcome,
+    * display if the new state is the same as previous,
+    * or redirect to the URL matching the new state.
+    */
+  protected final def applyThenRedirectOrDisplay(transition: Transition)(implicit
+    rc: RequestContext,
+    request: Request[_],
+    ec: ExecutionContext
+  ): Future[Result] =
+    journeyService.currentState
+      .flatMap {
+        case None =>
+          journeyService
+            .apply(transition)
+            .map(redirect)
+            .map(_(request))
+            .recover {
+              case TransitionNotAllowed(origin, breadcrumbs, _) =>
+                redirect((origin, breadcrumbs))(request) // renders current state back
+            }
+
+        case Some((state, breadcrumbs)) =>
+          journeyService
+            .apply(transition)
+            .map {
+              case sb @ (newState, newBreadcrumbs) =>
+                if (newState == state) display(sb)
+                else redirect(sb)
+            }
+            .map(_(request))
+            .recover {
+              case TransitionNotAllowed(origin, breadcrumbs, _) =>
+                display((origin, breadcrumbs))(request) // renders current state back
+            }
+      }
+
+  /**
+    * Apply state transition and, depending on the outcome,
     * display if the new state matches expectations,
     * or redirect to the URL matching the new state.
     */
@@ -575,6 +612,25 @@ trait JourneyController[RequestContext] {
       }
     }
 
+    /**
+      * Apply state transition and, depending on the outcome,
+      * display if the new state is the same as previous,
+      * or redirect to the URL matching the new state.
+      */
+    def applyThenRedirectOrDisplay(
+      transition: Request[_] => Transition
+    ): ApplyThenRedirectOrDisplay =
+      new ApplyThenRedirectOrDisplay(transition)
+
+    class ApplyThenRedirectOrDisplay private[actions] (transition: Request[_] => Transition)
+        extends Executable {
+      override def execute(implicit request: Request[_], ec: ExecutionContext): Future[Result] = {
+        implicit val rc: RequestContext = JourneyController.this.context(request)
+        JourneyController.this
+          .applyThenRedirectOrDisplay(transition(request))
+      }
+    }
+
     /** Apply state transition and redirect to the URL matching the new state. */
     def applyWithRequest(transition: Request[_] => Transition): ApplyWithRequest =
       new ApplyWithRequest(transition)
@@ -789,6 +845,27 @@ trait JourneyController[RequestContext] {
           withAuthorised(request) { user: User =>
             implicit val rc: RequestContext = JourneyController.this.context(request)
             JourneyController.this.apply(transition(user), JourneyController.this.redirect)
+          }
+      }
+
+      /**
+        * Apply state transition and, depending on the outcome,
+        * display if the new state is the same as previous,
+        * or redirect to the URL matching the new state.
+        */
+      def applyThenRedirectOrDisplay(
+        transition: Request[_] => User => Transition
+      ): ApplyThenRedirectOrDisplay =
+        new ApplyThenRedirectOrDisplay(transition)
+
+      class ApplyThenRedirectOrDisplay private[actions] (
+        transition: Request[_] => User => Transition
+      ) extends Executable {
+        override def execute(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+          withAuthorised(request) { user: User =>
+            implicit val rc: RequestContext = JourneyController.this.context(request)
+            JourneyController.this
+              .applyThenRedirectOrDisplay(transition(request)(user))
           }
       }
 
