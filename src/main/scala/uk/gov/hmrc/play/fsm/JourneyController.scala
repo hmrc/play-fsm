@@ -22,6 +22,7 @@ import play.api.mvc._
 import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
+import play.api.libs.json.Reads
 
 /**
   * Controller mixin for journeys implementing Finite State Machine.
@@ -378,6 +379,26 @@ trait JourneyController[RequestContext] {
         userInput => apply(transition(userInput), redirect)
       )
 
+  /**
+    * Parse request's body as JSON and apply transition if success,
+    * otherwise return ifFailure result.
+    */
+  protected final def parseJson[T: Reads](
+    transition: T => Transition
+  )(implicit
+    rc: RequestContext,
+    request: Request[_],
+    ec: ExecutionContext
+  ): Future[Result] = {
+    val body = request.asInstanceOf[Request[AnyContent]].body
+    body.asJson.flatMap(_.asOpt[T]) match {
+      case Some(entity) =>
+        apply(transition(entity), redirect)
+      case None =>
+        Future.failed(new IllegalArgumentException)
+    }
+  }
+
   //-------------------------------------------------
   // USER AUTHORIZATION HELPERS
   //-------------------------------------------------
@@ -467,6 +488,55 @@ trait JourneyController[RequestContext] {
               .cleanBreadcrumbs(_ => Nil)(context(request), ec)
               .map(_ => result)
           }
+      }
+    }
+
+    /** Transform result using provided partial function. */
+    def transform(fx: PartialFunction[Result, Result]): Executable = {
+      val outer = this
+      new Executable {
+        def execute(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+          outer.execute.map(result => fx.applyOrElse[Result, Result](result, _ => result))
+      }
+    }
+
+    /** Use custom {@see renderState} function. */
+    def withCustomRenderState(
+      renderState: Request[_] => (State, Breadcrumbs, Option[Form[_]]) => Result
+    ): Executable = {
+      val outer = this
+      new Executable {
+        def execute(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+          outer.execute.flatMap { _ =>
+            implicit val rc: RequestContext = context(request)
+            journeyService.currentState.flatMap {
+              case Some((state, breadcrumbs)) =>
+                Future.successful(renderState(request)(state, breadcrumbs, None))
+              case None => redirectToStart
+            }
+          }
+      }
+    }
+
+    /** Recover from a error with custom strategy. */
+    def recover(
+      recoveryStrategy: PartialFunction[Throwable, Result]
+    ): Executable = {
+      val outer = this
+      new Executable {
+        def execute(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+          outer.execute.recover(recoveryStrategy)
+      }
+    }
+
+    /** Recover from a error with custom strategy. */
+    def recoverWith(
+      recoveryStrategy: Request[_] => PartialFunction[Throwable, Future[Result]]
+    ): Executable = {
+      val outer = this
+      new Executable {
+        def execute(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+          outer.execute.recoverWith(recoveryStrategy(request))
       }
     }
   }
@@ -655,7 +725,7 @@ trait JourneyController[RequestContext] {
     class BindForm[Payload] private[actions] (form: Form[Payload]) {
 
       /**
-        * Apply state transition parametrized by the form output
+        * Apply the state transition parametrized by the form output
         * and redirect to the URL matching the new state.
         */
       def apply(transition: Payload => Transition): Apply = new Apply(transition)
@@ -668,7 +738,7 @@ trait JourneyController[RequestContext] {
       }
 
       /**
-        * Apply state transition parametrized by the form output
+        * Apply the state transition parametrized by the form output
         * and redirect to the URL matching the new state.
         */
       def applyWithRequest(transition: Request[_] => Payload => Transition): ApplyWithRequest =
@@ -679,6 +749,45 @@ trait JourneyController[RequestContext] {
         override def execute(implicit request: Request[_], ec: ExecutionContext): Future[Result] = {
           implicit val rc: RequestContext = JourneyController.this.context(request)
           JourneyController.this.bindForm(form, transition(request))
+        }
+      }
+    }
+
+    /**
+      * Parse the JSON body of the request.
+      * If valid, apply the following transition,
+      * if not valid, return the alternative result.
+      * @tparam Entity entity
+      */
+    def parseJson[Entity: Reads]: ParseJson[Entity] = new ParseJson[Entity]
+
+    class ParseJson[Entity: Reads] private[actions] {
+
+      /**
+        * Parse request's body as JSON and apply the state transition if success,
+        * otherwise return ifFailure result.
+        */
+      def apply(transition: Entity => Transition): Apply = new Apply(transition)
+
+      class Apply private[actions] (transition: Entity => Transition) extends Executable {
+        override def execute(implicit request: Request[_], ec: ExecutionContext): Future[Result] = {
+          implicit val rc: RequestContext = JourneyController.this.context(request)
+          JourneyController.this.parseJson(transition)
+        }
+      }
+
+      /**
+        * Parse request's body as JSON and apply the state transition if success,
+        * otherwise return ifFailure result.
+        */
+      def applyWithRequest(transition: Request[_] => Entity => Transition): ApplyWithRequest =
+        new ApplyWithRequest(transition)
+
+      class ApplyWithRequest private[actions] (transition: Request[_] => Entity => Transition)
+          extends Executable {
+        override def execute(implicit request: Request[_], ec: ExecutionContext): Future[Result] = {
+          implicit val rc: RequestContext = JourneyController.this.context(request)
+          JourneyController.this.parseJson(transition(request))
         }
       }
     }
@@ -928,6 +1037,57 @@ trait JourneyController[RequestContext] {
             withAuthorised(request) { user: User =>
               implicit val rc: RequestContext = JourneyController.this.context(request)
               JourneyController.this.bindForm(form, transition(request)(user))
+            }
+        }
+      }
+
+      /**
+        * Parse the JSON body of the request.
+        * If valid, apply the following transition,
+        * if not valid, return the alternative result.
+        * @tparam Entity entity
+        */
+      def parseJson[Entity: Reads](ifFailure: Request[_] => Future[Result]): ParseJson[Entity] =
+        new ParseJson[Entity](ifFailure)
+
+      class ParseJson[Entity: Reads] private[actions] (ifFailure: Request[_] => Future[Result]) {
+
+        /**
+          * Parse request's body as JSON and apply the state transition if success,
+          * otherwise return ifFailure result.
+          */
+        def apply(transition: User => Entity => Transition): Apply = new Apply(transition)
+
+        class Apply private[actions] (transition: User => Entity => Transition) extends Executable {
+          override def execute(implicit
+            request: Request[_],
+            ec: ExecutionContext
+          ): Future[Result] =
+            withAuthorised(request) { user: User =>
+              implicit val rc: RequestContext = JourneyController.this.context(request)
+              JourneyController.this.parseJson(transition(user))
+            }
+        }
+
+        /**
+          * Parse request's body as JSON and apply the state transition if success,
+          * otherwise return ifFailure result.
+          */
+        def applyWithRequest(
+          transition: Request[_] => User => Entity => Transition
+        ): ApplyWithRequest =
+          new ApplyWithRequest(transition)
+
+        class ApplyWithRequest private[actions] (
+          transition: Request[_] => User => Entity => Transition
+        ) extends Executable {
+          override def execute(implicit
+            request: Request[_],
+            ec: ExecutionContext
+          ): Future[Result] =
+            withAuthorised(request) { user: User =>
+              implicit val rc: RequestContext = JourneyController.this.context(request)
+              JourneyController.this.parseJson(transition(request)(user))
             }
         }
       }

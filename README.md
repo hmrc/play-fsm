@@ -263,7 +263,7 @@ or
         .using(Mergers.toStart)
 ```
 
-- render the current state if matches the pattern (type), eventually rolling the history back, otherwise apply the transition and display/redirect to the resulting state
+- render the current state if matches the pattern (type), eventually rolling the history back, otherwise apply the transition and display/redirect to the new state
 
 ```
     val showStart: Action[AnyContent] = actions
@@ -271,7 +271,7 @@ or
         .orApply(Transitions.start)
 ```
 
-- render the current state if matches the pattern (type), eventually rolling the history back and merging historic state with the current one, otherwise apply the transition and display/redirect to the resulting state
+- render the current state if matches the pattern (type), eventually rolling the history back and merging historic state with the current one, otherwise apply the transition and display/redirect to the new state
 
 ```
     val showStart: Action[AnyContent] = actions
@@ -280,7 +280,7 @@ or
         .orApply(Transitions.start)
 ```
 
-- apply the transition to current state and redirect to the resulting state
+- apply the transition to current state and redirect to the new state
 
 ```
     val stop: Action[AnyContent] = actions.apply(Transitions.stop)
@@ -292,10 +292,36 @@ or
       }
 ```
 
+- apply the transition to current state and redirect to the new state if has changed, otherwise re-display the state
+
+```
+    val stop: Action[AnyContent] = actions.applyThenRedirectOrDisplay(Transitions.stop)
+```
+
+- bind the form and apply transition if success, otherwise redirect to the current page with failed form flashed in
+
+```
+    val processForm: Action[AnyContent] = 
+        actions
+            .bindForm(Forms.myForm)
+            .apply(Transitions.processFormInput)
+```
+
+- parse json payload and apply transition if success, otherwise use recovery strategy
+
+```
+    val processJson: Action[AnyContent] = 
+        actions
+            .parseJson[MyPayload]
+            .apply(Transitions.processMyPayload)
+            .recover { case _ => BadRequest }
+```
+
 - clear or refine the journey history after transition (cleanBreadcrumbs)
 
 ```
-    val showStart: Action[AnyContent] = actions.show[State.Start.type].andCleanBreadcrumbs()
+    val showStart: Action[AnyContent] = 
+        actions.show[State.Start.type].andCleanBreadcrumbs()
 ```
 or
 ```
@@ -309,6 +335,30 @@ or
       }
 ```
 
+- use alternative state renderer
+
+```
+    val stop: Action[AnyContent] = 
+        actions
+            .apply(Transitions.stop)
+            .withCustomRenderState(implicit request => someRenderState2)
+```
+
+- use custom error recovery strategies
+
+```
+    val stop: Action[AnyContent] = 
+        actions
+            .apply(Transitions.stop)
+            .recover {case _: Exception => BadRequest}
+
+
+    val stop: Action[AnyContent] = 
+        actions
+            .apply(Transitions.stop)
+            .recoverWith(implict request => {case _: Exception => Future.successful(BadRequest)})     
+```
+
 - to enforce unique journeyId in the session mixin `JourneyIdSupport`
 
 ```
@@ -316,8 +366,6 @@ or
             with JourneyController[MyContext]
             with JourneyIdSupport[MyContext] {
 ```
-
-- authorisation
 
 ### Service patterns
 
@@ -360,6 +408,14 @@ or
     val stop: Action[AnyContent] = action { implicit request =>
         whenAuthorised(asUser)(Transitions.stop)(redirect)
       }
+```
+
+- display or redirect only when user has been authorized
+
+```
+    val stop: Action[AnyContent] = actions
+        .whenAuthorised(asUser)
+        .applyThenRedirectOrDisplay(_ => Transitions.stop)
 ```
 
 - display page for an authorized user only
