@@ -57,6 +57,11 @@ object DummyJourneyModel extends JourneyModel {
         case State.Continue("stop") => goto(State.Stop(fx("continue")))
         case _                      => goto(DeadEnd(fx("empty")))
       }
+
+    def processPayload(payload: TestPayload) =
+      Transition {
+        case _ => goto(State.Continue(payload.msg))
+      }
   }
 
   object Mergers {

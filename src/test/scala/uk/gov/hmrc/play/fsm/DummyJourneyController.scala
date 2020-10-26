@@ -23,6 +23,7 @@ import play.twirl.api.Html
 import uk.gov.hmrc.play.fsm.OptionalFormOps._
 
 import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
 
 @Singleton
 class DummyJourneyController @Inject() (override val journeyService: DummyJourneyService)(implicit
@@ -147,6 +148,28 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
       .show[State.DeadEnd]
       .using(Mergers.toDeadEnd)
 
+  val parseJson1: Action[AnyContent] =
+    actions
+      .parseJson[TestPayload]
+      .apply(Transitions.processPayload)
+      .recoverWith(implicit request => { case _ => Future.successful(BadRequest) })
+
+  val parseJson2: Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .parseJson[TestPayload](ifFailure = _ => Future.successful(BadRequest))
+      .apply(user => Transitions.processPayload)
+      .recover { case _ => BadRequest }
+
+  val parseJson3: Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .parseJson[TestPayload](ifFailure = _ => Future.successful(BadRequest))
+      .apply(user => Transitions.processPayload)
+      .withCustomRenderState(implicit request => renderState2)
+      .recover { case _ => BadRequest }
+      .transform { case BadRequest => NotFound }
+
   // VIEWS
 
   /** implement this to map states into endpoints for redirection and back linking */
@@ -173,6 +196,18 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
         Ok(s"Continue with $arg and form ${formWithErrors.or(ArgForm, Some("dummy"))}")
       case State.Stop(result)    => Ok(s"Result is $result")
       case State.DeadEnd(result) => Ok(s"Dead end: $result")
+    }
+
+  def renderState2(
+    state: journeyService.model.State,
+    breadcrumbs: List[journeyService.model.State],
+    formWithErrors: Option[Form[_]]
+  )(implicit request: Request[_]): Result =
+    state match {
+      case State.Start           => Ok("Start")
+      case State.Continue(arg)   => Created("Continue")
+      case State.Stop(result)    => Accepted("Stop")
+      case State.DeadEnd(result) => NotFound("DeadEnd")
     }
 }
 

@@ -25,6 +25,9 @@ import play.api.test.Helpers.{redirectLocation, _}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.FiniteDuration
+import play.api.mvc.AnyContent
+import play.api.libs.json.Json
+import akka.stream.Materializer
 
 class DummyJourneyControllerSpec
     extends UnitSpec
@@ -610,6 +613,86 @@ class DummyJourneyControllerSpec
       status(result) shouldBe 200
       journeyState.get should have[State](
         State.DeadEnd("stop"),
+        List(State.Start)
+      )
+    }
+
+    "dsl: after POST /payload go to Continue with new message" in {
+      journeyState.set(State.Continue("stop"), List(State.Start))
+      val result = controller.parseJson1(
+        fakeRequest
+          .withBody[AnyContent](AnyContent(Json.parse("""{"msg":"hello"}""")))
+      )
+      status(result) shouldBe 303
+      journeyState.get should have[State](
+        State.Continue("hello"),
+        List(State.Continue("stop"), State.Start)
+      )
+    }
+
+    "dsl: after POST /payload show BadRequest if wrong payload" in {
+      journeyState.set(State.Continue("stop"), List(State.Start))
+      val result = controller.parseJson1(
+        fakeRequest
+          .withBody[AnyContent](AnyContent("""{"msg":}"""))
+      )
+      status(result) shouldBe 400
+      journeyState.get should have[State](
+        State.Continue("stop"),
+        List(State.Start)
+      )
+    }
+
+    "dsl2: after POST /payload go to Continue with new message" in {
+      journeyState.set(State.Continue("stop"), List(State.Start))
+      val result = controller.parseJson2(
+        fakeRequest
+          .withBody[AnyContent](AnyContent(Json.parse("""{"msg":"hello"}""")))
+      )
+      status(result) shouldBe 303
+      journeyState.get should have[State](
+        State.Continue("hello"),
+        List(State.Continue("stop"), State.Start)
+      )
+    }
+
+    "dsl2: after POST /payload show BadRequest if wrong payload" in {
+      journeyState.set(State.Continue("stop"), List(State.Start))
+      val result = controller.parseJson2(
+        fakeRequest
+          .withBody[AnyContent](AnyContent("""{"msg":}"""))
+      )
+      status(result) shouldBe 400
+      journeyState.get should have[State](
+        State.Continue("stop"),
+        List(State.Start)
+      )
+    }
+
+    "dsl3: after POST /payload go to Continue with new message" in {
+      implicit val materializer: Materializer = app.materializer
+      journeyState.set(State.Continue("stop"), List(State.Start))
+      val result = controller.parseJson3(
+        fakeRequest
+          .withBody[AnyContent](AnyContent(Json.parse("""{"msg":"hello"}""")))
+      )
+      status(result)        shouldBe 201
+      bodyOf(await(result)) shouldBe "Continue"
+      journeyState.get should have[State](
+        State.Continue("hello"),
+        List(State.Continue("stop"), State.Start)
+      )
+    }
+
+    "dsl3: after POST /payload show BadRequest if wrong payload" in {
+      journeyState.set(State.Continue("stop"), List(State.Start))
+      val result = controller.parseJson3(
+        fakeRequest
+          .withBody[AnyContent](AnyContent("""{"msg":}"""))
+      )
+      status(result) shouldBe 404
+      journeyState.get should have[State](
+        State.Continue("stop"),
         List(State.Start)
       )
     }
