@@ -306,7 +306,17 @@ or
 - apply the transition to current state and redirect to the new state if has changed, otherwise re-display the state
 
 ```
-    val stop: Action[AnyContent] = actions.applyThenRedirectOrDisplay(Transitions.stop)
+    val stop: Action[AnyContent] = actions
+        .apply(Transitions.stop)
+        .redirectOrDisplayIfSame
+```
+
+- apply the transition to current state and display if new state is of expected type, otherwise redirect to the new state
+
+```
+    val stop: Action[AnyContent] = actions
+        .apply(Transitions.stop)
+        .redirectOrDisplayIf[State.Stop]
 ```
 
 - bind the form and apply transition if success, otherwise redirect to the current page with failed form flashed in
@@ -456,7 +466,8 @@ or
 ```
     val stop: Action[AnyContent] = actions
         .whenAuthorised(asUser)
-        .applyThenRedirectOrDisplay(_ => Transitions.stop)
+        .apply(Transitions.stop)
+        .redirectOrDisplayIfSame
 ```
 
 - display page for an authorized user only

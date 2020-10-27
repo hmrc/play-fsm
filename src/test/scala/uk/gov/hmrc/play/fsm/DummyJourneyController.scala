@@ -99,10 +99,75 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
   val stopDsl: Action[AnyContent] = actions.whenAuthorised(asUser).apply(Transitions.stop)
 
   val stopDsl2: Action[AnyContent] =
-    actions.whenAuthorised(asUser).applyWithRequest(_ => Transitions.stop)
+    actions
+      .whenAuthorised(asUser)
+      .applyWithRequest(_ => Transitions.stop)
 
   val stopDsl3: Action[AnyContent] =
-    actions.whenAuthorised(asUser).applyThenRedirectOrDisplay(_ => Transitions.stop)
+    actions
+      .whenAuthorised(asUser)
+      .apply(Transitions.stop)
+      .redirectOrDisplayIfSame
+
+  val stopDsl4: Action[AnyContent] =
+    actions
+      .apply(Transitions.stop(555))
+      .redirectOrDisplayIfSame
+
+  val stopDsl5: Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .applyWithRequest(_ => Transitions.stop)
+      .redirectOrDisplayIfSame
+
+  val stopDsl6: Action[AnyContent] =
+    actions
+      .applyWithRequest(_ => Transitions.stop(555))
+      .redirectOrDisplayIfSame
+
+  val stopDsl7: Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .apply(Transitions.stop)
+      .redirectOrDisplayIf[State.Stop]
+
+  val stopDsl8: Action[AnyContent] =
+    actions
+      .apply(Transitions.stop(555))
+      .redirectOrDisplayIf[State.Stop]
+
+  val stopDsl9: Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .applyWithRequest(_ => Transitions.stop)
+      .redirectOrDisplayIf[State.Stop]
+
+  val stopDsl10: Action[AnyContent] =
+    actions
+      .applyWithRequest(_ => Transitions.stop(555))
+      .redirectOrDisplayIf[State.Stop]
+
+  val stopDsl11: Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .apply(Transitions.stop)
+      .redirectOrDisplayIf[State.Continue]
+
+  val stopDsl12: Action[AnyContent] =
+    actions
+      .apply(Transitions.stop(555))
+      .redirectOrDisplayIf[State.Continue]
+
+  val stopDsl13: Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .applyWithRequest(_ => Transitions.stop)
+      .redirectOrDisplayIf[State.Continue]
+
+  val stopDsl14: Action[AnyContent] =
+    actions
+      .applyWithRequest(_ => Transitions.stop(555))
+      .redirectOrDisplayIf[State.Continue]
 
   val showStop: Action[AnyContent] = actionShowStateWhenAuthorised(asUser) {
     case State.Stop(_) =>
