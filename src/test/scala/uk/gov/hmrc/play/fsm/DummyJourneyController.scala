@@ -24,6 +24,7 @@ import uk.gov.hmrc.play.fsm.OptionalFormOps._
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
+import java.util.concurrent.TimeoutException
 
 @Singleton
 class DummyJourneyController @Inject() (override val journeyService: DummyJourneyService)(implicit
@@ -166,9 +167,41 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
       .whenAuthorised(asUser)
       .parseJson[TestPayload](ifFailure = _ => Future.successful(BadRequest))
       .apply(user => Transitions.processPayload)
-      .withCustomRenderState(implicit request => renderState2)
+      .renderUsing(implicit request => renderState2)
       .recover { case _ => BadRequest }
       .transform { case BadRequest => NotFound }
+
+  val wait1: Action[AnyContent] =
+    actions
+      .waitForStateAndDisplay[State.Continue](3)
+
+  val wait2: Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .waitForStateAndDisplay[State.Continue](3)
+      .recover { case e: TimeoutException => BadRequest }
+
+  val wait3: Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .waitForStateAndDisplay[State.Continue](3)
+      .orApply(_ => Transitions.showContinue)
+
+  val wait4: Action[AnyContent] =
+    actions
+      .waitForStateAndRedirect[State.Continue](3)
+
+  val wait5: Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .waitForStateAndRedirect[State.Continue](3)
+      .recover { case e: TimeoutException => BadRequest }
+
+  val wait6: Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .waitForStateAndRedirect[State.Continue](3)
+      .orApply(_ => Transitions.showContinue)
 
   // VIEWS
 

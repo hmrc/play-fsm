@@ -335,16 +335,30 @@ or
       }
 ```
 
-- use alternative state renderer
+- use an alternative state renderer
 
 ```
     val stop: Action[AnyContent] = 
         actions
             .apply(Transitions.stop)
-            .withCustomRenderState(implicit request => someRenderState2)
+            .renderUsing(implicit request => someRenderState2)
 ```
 
-- use custom error recovery strategies
+- wait for an async change of state (e.g. waiting for a backend callback)
+
+```
+    val stop: Action[AnyContent] = 
+        actions
+            .waitForStateAndDisplay[State.continue](30) //seconds
+            .recover{ case e: TimeoutException => BadRequest }
+
+    val stop: Action[AnyContent] = 
+        actions
+            .waitForStateAndRedirect[State.continue](30) //seconds
+            .orApply(Transitions.forceContinue)       
+```
+
+- use custom error recovery strategy
 
 ```
     val stop: Action[AnyContent] = 
