@@ -28,6 +28,8 @@ import scala.concurrent.duration.FiniteDuration
 import play.api.mvc.AnyContent
 import play.api.libs.json.Json
 import akka.stream.Materializer
+import scala.concurrent.Future
+import java.util.concurrent.TimeoutException
 
 class DummyJourneyControllerSpec
     extends UnitSpec
@@ -693,6 +695,152 @@ class DummyJourneyControllerSpec
       status(result) shouldBe 404
       journeyState.get should have[State](
         State.Continue("stop"),
+        List(State.Start)
+      )
+    }
+
+    "dsl: after GET /wait show Continue when ready" in {
+      journeyState.set(State.Start, Nil)
+      Schedule(1000) {
+        Future {
+          journeyState.set(State.Continue("stop"), List(State.Start))
+        }
+      }
+      val result = controller.wait1(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](
+        State.Continue("stop"),
+        List(State.Start)
+      )
+    }
+
+    "dsl: after GET /wait show 400 when timeout" in {
+      journeyState.set(State.Start, Nil)
+      an[TimeoutException] shouldBe thrownBy {
+        await(controller.wait1(fakeRequest))
+      }
+      journeyState.get should have[State](State.Start, Nil)
+    }
+
+    "dsl2: after GET /wait show Continue when ready" in {
+      journeyState.set(State.Start, Nil)
+      Schedule(1000) {
+        Future {
+          journeyState.set(State.Continue("stop"), List(State.Start))
+        }
+      }
+      val result = controller.wait2(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](
+        State.Continue("stop"),
+        List(State.Start)
+      )
+    }
+
+    "dsl2: after GET /wait show 400 when timeout" in {
+      journeyState.set(State.Start, Nil)
+      val result = controller.wait2(fakeRequest)
+      status(result) shouldBe 400
+      journeyState.get should have[State](
+        State.Start,
+        Nil
+      )
+    }
+
+    "dsl3: after GET /wait show Continue when ready" in {
+      journeyState.set(State.Start, Nil)
+      Schedule(1000) {
+        Future {
+          journeyState.set(State.Continue("stop"), List(State.Start))
+        }
+      }
+      val result = controller.wait3(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](
+        State.Continue("stop"),
+        List(State.Start)
+      )
+    }
+
+    "dsl3: after GET /wait show Continue when timeout" in {
+      journeyState.set(State.Start, Nil)
+      val result = controller.wait3(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](
+        State.Continue("yummy"),
+        List(State.Start)
+      )
+    }
+
+    "dsl4: after GET /wait show Continue when ready" in {
+      journeyState.set(State.Start, Nil)
+      Schedule(1000) {
+        Future {
+          journeyState.set(State.Continue("stop"), List(State.Start))
+        }
+      }
+      val result = controller.wait4(fakeRequest)
+      status(result) shouldBe 303
+      journeyState.get should have[State](
+        State.Continue("stop"),
+        List(State.Start)
+      )
+    }
+
+    "dsl4: after GET /wait show 400 when timeout" in {
+      journeyState.set(State.Start, Nil)
+      an[TimeoutException] shouldBe thrownBy {
+        await(controller.wait4(fakeRequest))
+      }
+      journeyState.get should have[State](State.Start, Nil)
+    }
+
+    "dsl5: after GET /wait show Continue when ready" in {
+      journeyState.set(State.Start, Nil)
+      Schedule(1000) {
+        Future {
+          journeyState.set(State.Continue("stop"), List(State.Start))
+        }
+      }
+      val result = controller.wait5(fakeRequest)
+      status(result) shouldBe 303
+      journeyState.get should have[State](
+        State.Continue("stop"),
+        List(State.Start)
+      )
+    }
+
+    "dsl5: after GET /wait show 400 when timeout" in {
+      journeyState.set(State.Start, Nil)
+      val result = controller.wait5(fakeRequest)
+      status(result) shouldBe 400
+      journeyState.get should have[State](
+        State.Start,
+        Nil
+      )
+    }
+
+    "dsl6: after GET /wait show Continue when ready" in {
+      journeyState.set(State.Start, Nil)
+      Schedule(1000) {
+        Future {
+          journeyState.set(State.Continue("stop"), List(State.Start))
+        }
+      }
+      val result = controller.wait6(fakeRequest)
+      status(result) shouldBe 303
+      journeyState.get should have[State](
+        State.Continue("stop"),
+        List(State.Start)
+      )
+    }
+
+    "dsl6: after GET /wait show Continue when timeout" in {
+      journeyState.set(State.Start, Nil)
+      val result = controller.wait6(fakeRequest)
+      status(result) shouldBe 303
+      journeyState.get should have[State](
+        State.Continue("yummy"),
         List(State.Start)
       )
     }
