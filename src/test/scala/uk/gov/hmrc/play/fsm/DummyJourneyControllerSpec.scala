@@ -47,6 +47,8 @@ class DummyJourneyControllerSpec
   lazy val controller: DummyJourneyController =
     app.injector.instanceOf[DummyJourneyController]
 
+  implicit lazy val materializer: Materializer = app.materializer
+
   import journeyState.model.State
 
   def fakeRequest = FakeRequest()
@@ -672,7 +674,6 @@ class DummyJourneyControllerSpec
     }
 
     "dsl3: after POST /payload go to Continue with new message" in {
-      implicit val materializer: Materializer = app.materializer
       journeyState.set(State.Continue("stop"), List(State.Start))
       val result = controller.parseJson3(
         fakeRequest
@@ -842,6 +843,114 @@ class DummyJourneyControllerSpec
       journeyState.get should have[State](
         State.Continue("yummy"),
         List(State.Start)
+      )
+    }
+
+    "dsl: after GET /current show current Start state" in {
+      journeyState.set(State.Start, Nil)
+      val result = controller.current1(fakeRequest)
+      status(result)        shouldBe 200
+      bodyOf(await(result)) shouldBe """Start | <a href="/start">back</a>"""
+      journeyState.get        should have[State](State.Start, Nil)
+    }
+
+    "dsl: after GET /current show current Continue state" in {
+      journeyState.set(State.Continue("foo"), List(State.Start))
+      val result = controller.current1(fakeRequest)
+      status(result)        shouldBe 200
+      bodyOf(await(result)) shouldBe "Continue with foo and form"
+      journeyState.get        should have[State](State.Continue("foo"), List(State.Start))
+    }
+
+    "dsl: after GET /current show current Stop state" in {
+      journeyState.set(State.Stop("bar"), List(State.Continue("foo"), State.Start))
+      val result = controller.current1(fakeRequest)
+      status(result)        shouldBe 200
+      bodyOf(await(result)) shouldBe """Result is bar"""
+      journeyState.get should have[State](
+        State.Stop("bar"),
+        List(State.Continue("foo"), State.Start)
+      )
+    }
+
+    "dsl2: after GET /current show current Start state" in {
+      journeyState.set(State.Start, Nil)
+      val result = controller.current2(fakeRequest)
+      status(result)        shouldBe 200
+      bodyOf(await(result)) shouldBe """Start"""
+      journeyState.get        should have[State](State.Start, Nil)
+    }
+
+    "dsl2: after GET /current show current Continue state" in {
+      journeyState.set(State.Continue("foo"), List(State.Start))
+      val result = controller.current2(fakeRequest)
+      status(result)        shouldBe 201
+      bodyOf(await(result)) shouldBe "Continue"
+      journeyState.get        should have[State](State.Continue("foo"), List(State.Start))
+    }
+
+    "dsl2: after GET /current show current Stop state" in {
+      journeyState.set(State.Stop("bar"), List(State.Continue("foo"), State.Start))
+      val result = controller.current2(fakeRequest)
+      status(result)        shouldBe 202
+      bodyOf(await(result)) shouldBe """Stop"""
+      journeyState.get should have[State](
+        State.Stop("bar"),
+        List(State.Continue("foo"), State.Start)
+      )
+    }
+
+    "dsl3: after GET /current show current Start state" in {
+      journeyState.set(State.Start, Nil)
+      val result = controller.current3(fakeRequest)
+      status(result)        shouldBe 200
+      bodyOf(await(result)) shouldBe """Start | <a href="/start">back</a>"""
+      journeyState.get        should have[State](State.Start, Nil)
+    }
+
+    "dsl3: after GET /current show current Continue state" in {
+      journeyState.set(State.Continue("foo"), List(State.Start))
+      val result = controller.current3(fakeRequest)
+      status(result)        shouldBe 200
+      bodyOf(await(result)) shouldBe "Continue with foo and form"
+      journeyState.get        should have[State](State.Continue("foo"), List(State.Start))
+    }
+
+    "dsl3: after GET /current show current Stop state" in {
+      journeyState.set(State.Stop("bar"), List(State.Continue("foo"), State.Start))
+      val result = controller.current3(fakeRequest)
+      status(result)        shouldBe 200
+      bodyOf(await(result)) shouldBe """Result is bar"""
+      journeyState.get should have[State](
+        State.Stop("bar"),
+        List(State.Continue("foo"), State.Start)
+      )
+    }
+
+    "dsl4: after GET /current show current Start state" in {
+      journeyState.set(State.Start, Nil)
+      val result = controller.current4(fakeRequest)
+      status(result)        shouldBe 200
+      bodyOf(await(result)) shouldBe """Start"""
+      journeyState.get        should have[State](State.Start, Nil)
+    }
+
+    "dsl4: after GET /current show current Continue state" in {
+      journeyState.set(State.Continue("foo"), List(State.Start))
+      val result = controller.current4(fakeRequest)
+      status(result)        shouldBe 201
+      bodyOf(await(result)) shouldBe "Continue"
+      journeyState.get        should have[State](State.Continue("foo"), List(State.Start))
+    }
+
+    "dsl4: after GET /current show current Stop state" in {
+      journeyState.set(State.Stop("bar"), List(State.Continue("foo"), State.Start))
+      val result = controller.current4(fakeRequest)
+      status(result)        shouldBe 202
+      bodyOf(await(result)) shouldBe """Stop"""
+      journeyState.get should have[State](
+        State.Stop("bar"),
+        List(State.Continue("foo"), State.Start)
       )
     }
 

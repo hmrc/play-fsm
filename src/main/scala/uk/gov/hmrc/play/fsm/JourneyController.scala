@@ -570,6 +570,35 @@ trait JourneyController[RequestContext] {
   object actions {
 
     /**
+      * Displays the current state using default {{{renderState}}} function.
+      * If there is no state yet then redirects to the start.
+      */
+    val showCurrentState: Executable = new ShowCurrentState(implicit request =>
+      JourneyController.this.renderState
+    )
+
+    /**
+      * Displays the current state using custom render function.
+      * If there is no state yet then redirects to the start.
+      */
+    def showCurrentStateUsing(
+      renderState: Request[_] => (State, Breadcrumbs, Option[Form[_]]) => Result
+    ) = new ShowCurrentState(renderState)
+
+    class ShowCurrentState private[actions] (
+      renderState: Request[_] => (State, Breadcrumbs, Option[Form[_]]) => Result
+    ) extends Executable {
+      override def execute(implicit request: Request[_], ec: ExecutionContext): Future[Result] = {
+        implicit val rc: RequestContext = context(request)
+        JourneyController.this.journeyService.currentState.flatMap {
+          case Some((state, breadcrumbs)) =>
+            Future.successful(renderState(request)(state, breadcrumbs, None))
+          case None => JourneyController.this.redirectToStart
+        }
+      }
+    }
+
+    /**
       * Display the state requested by the type parameter S.
       * If the current state is not of type S,
       * try to rewind the history back to the nearest state matching S,
@@ -814,14 +843,14 @@ trait JourneyController[RequestContext] {
 
     /**
       * Wait until the state becomes of S type and display it,
-      * or if timeout expires raise a java.util.concurrent.TimeoutException.
+      * or if timeout expires raise a {{{java.util.concurrent.TimeoutException}}}.
       */
     def waitForStateAndDisplay[S <: State: ClassTag](timeoutInSeconds: Int): WaitFor[S] =
       new WaitFor[S](timeoutInSeconds)(display)
 
     /**
       * Wait until the state becomes of S type and redirect to it,
-      * or if timeout expires raise a java.util.concurrent.TimeoutException.
+      * or if timeout expires raise a {{{java.util.concurrent.TimeoutException}}}.
       */
     def waitForStateAndRedirect[S <: State: ClassTag](timeoutInSeconds: Int): WaitFor[S] =
       new WaitFor[S](timeoutInSeconds)(redirect)
@@ -866,6 +895,36 @@ trait JourneyController[RequestContext] {
       new WhenAuthorised[User](withAuthorised)
 
     class WhenAuthorised[User] private[actions] (withAuthorised: WithAuthorised[User]) {
+
+      /**
+        * Displays the current state using default {{{renderState}}} function.
+        * If there is no state yet then redirects to the start.
+        */
+      val showCurrentState: Executable = new ShowCurrentState(implicit request =>
+        JourneyController.this.renderState
+      )
+
+      /**
+        * Displays the current state using custom render function.
+        * If there is no state yet then redirects to the start.
+        */
+      def showCurrentStateUsing(
+        renderState: Request[_] => (State, Breadcrumbs, Option[Form[_]]) => Result
+      ) = new ShowCurrentState(renderState)
+
+      class ShowCurrentState private[actions] (
+        renderState: Request[_] => (State, Breadcrumbs, Option[Form[_]]) => Result
+      ) extends Executable {
+        override def execute(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+          withAuthorised(request) { _ =>
+            implicit val rc: RequestContext = context(request)
+            JourneyController.this.journeyService.currentState.flatMap {
+              case Some((state, breadcrumbs)) =>
+                Future.successful(renderState(request)(state, breadcrumbs, None))
+              case None => JourneyController.this.redirectToStart
+            }
+          }
+      }
 
       /**
         * Display the state requested by the type parameter S.
@@ -1161,14 +1220,14 @@ trait JourneyController[RequestContext] {
 
       /**
         * Wait until the state becomes of S type and display it,
-        * or if timeout expires raise a java.util.concurrent.TimeoutException.
+        * or if timeout expires raise a {{{java.util.concurrent.TimeoutException}}}.
         */
       def waitForStateAndDisplay[S <: State: ClassTag](timeoutInSeconds: Int): WaitFor[S] =
         new WaitFor[S](timeoutInSeconds)(display)
 
       /**
         * Wait until the state becomes of S type and redirect to it,
-        * or if timeout expires raise a java.util.concurrent.TimeoutException.
+        * or if timeout expires raise a {{{java.util.concurrent.TimeoutException}}}.
         */
       def waitForStateAndRedirect[S <: State: ClassTag](timeoutInSeconds: Int): WaitFor[S] =
         new WaitFor[S](timeoutInSeconds)(redirect)
