@@ -76,9 +76,21 @@ trait JourneyController[RequestContext] {
     (state: StateAndBreadcrumbs) =>
       (request: Request[_]) => Results.Redirect(getCallFor(state._1)(request))
 
-  /** Returns a call to the previous state */
+  /** Returns a call to the previous state. */
   protected def backLinkFor(breadcrumbs: Breadcrumbs)(implicit request: Request[_]): Call =
     breadcrumbs.headOption.map(getCallFor).getOrElse(getCallFor(journeyService.model.root))
+
+  /** Returns a call to the latest state of S type. */
+  protected def backLinkToMostRecent[S <: State: ClassTag](
+    breadcrumbs: Breadcrumbs
+  )(implicit request: Request[_]): Call =
+    breadcrumbs
+      .find {
+        case s: S => true
+        case _    => false
+      }
+      .map(getCallFor)
+      .getOrElse(getCallFor(journeyService.model.root))
 
   //-------------------------------------------------
   // TRANSITION HELPERS
