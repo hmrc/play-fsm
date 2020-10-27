@@ -954,6 +954,11 @@ class DummyJourneyControllerSpec
       )
     }
 
+    "find latest backlink to Continue" in {
+      implicit val request = fakeRequest
+      controller.backlink1.url shouldBe "/continue"
+    }
+
   }
 
 }

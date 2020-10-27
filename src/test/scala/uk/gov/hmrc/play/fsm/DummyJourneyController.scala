@@ -220,6 +220,18 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
       .whenAuthorised(asUser)
       .showCurrentStateUsing(implicit request => renderState2)
 
+  def backlink1(implicit request: Request[_]) =
+    backLinkToMostRecent[State.Continue](
+      List(
+        State.Start,
+        State.Stop("1"),
+        State.Continue("1"),
+        State.Stop("3"),
+        State.Continue("3"),
+        State.Continue("2")
+      )
+    )
+
   // VIEWS
 
   /** implement this to map states into endpoints for redirection and back linking */

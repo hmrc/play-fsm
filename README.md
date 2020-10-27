@@ -134,7 +134,7 @@ or
     - How to wire action calls into model transitions, use provided action helpers selection, see <https://github.com/hmrc/play-fsm/blob/master/src/test/scala/uk/gov/hmrc/play/fsm/DummyJourneyController.scala>.
     - How to display the state after GET call, implement `renderState`
 - Map all GET calls to states, implement `getCallFor` method
-- Use `backlinkFor` method to get back link call given breadcrumbs
+- Use `backlinkFor` or `backlinkToMostRecent[S]` method to get back link call given breadcrumbs
 - GET actions should be idempotent, i.e. should only render existing or historical state.
 - POST actions should always invoke some state transition and be followed be a redirect.
 
