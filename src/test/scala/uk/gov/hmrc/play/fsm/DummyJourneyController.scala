@@ -203,6 +203,23 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
       .waitForStateAndRedirect[State.Continue](3)
       .orApply(_ => Transitions.showContinue)
 
+  val current1: Action[AnyContent] =
+    actions.showCurrentState
+
+  val current2: Action[AnyContent] =
+    actions
+      .showCurrentStateUsing(implicit request => renderState2)
+
+  val current3: Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .showCurrentState
+
+  val current4: Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .showCurrentStateUsing(implicit request => renderState2)
+
   // VIEWS
 
   /** implement this to map states into endpoints for redirection and back linking */
@@ -224,9 +241,9 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
       case State.Start =>
         Ok(Html(s"""Start | <a href="${backLinkFor(breadcrumbs).url}">back</a>"""))
       case State.Continue(arg) if arg.nonEmpty =>
-        Ok(s"Continue with $arg and form ${formWithErrors.or(ArgForm)}")
+        Ok(s"Continue with $arg and form")
       case State.Continue(arg) =>
-        Ok(s"Continue with $arg and form ${formWithErrors.or(ArgForm, Some("dummy"))}")
+        Ok(s"Continue with $arg and form")
       case State.Stop(result)    => Ok(s"Result is $result")
       case State.DeadEnd(result) => Ok(s"Dead end: $result")
     }
