@@ -238,6 +238,7 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
 
   val wait1: Action[AnyContent] =
     actions
+      .whenAuthorised(asUser)
       .waitForStateAndDisplay[State.Continue](3)
 
   val wait2: Action[AnyContent] =
@@ -250,10 +251,11 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
     actions
       .whenAuthorised(asUser)
       .waitForStateAndDisplay[State.Continue](3)
-      .orApply(_ => Transitions.showContinue)
+      .orApplyOnTimeout(_ => Transitions.showContinue)
 
   val wait4: Action[AnyContent] =
     actions
+      .whenAuthorised(asUser)
       .waitForStateAndRedirect[State.Continue](3)
 
   val wait5: Action[AnyContent] =
@@ -266,7 +268,61 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
     actions
       .whenAuthorised(asUser)
       .waitForStateAndRedirect[State.Continue](3)
-      .orApply(_ => Transitions.showContinue)
+      .orApplyOnTimeout(_ => Transitions.showContinue)
+
+  val wait7: Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .waitForStateAndRedirect[State.Continue](3)
+      .orApplyOnTimeout(_ => Transitions.showContinue)
+      .display
+
+  val wait8: Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .waitForStateAndRedirect[State.Continue](3)
+      .orApplyOnTimeout(_ => Transitions.showContinue)
+      .redirectOrDisplayIf[State.Continue]
+
+  val wait11: Action[AnyContent] =
+    actions
+      .waitForStateAndDisplay[State.Continue](3)
+
+  val wait12: Action[AnyContent] =
+    actions
+      .waitForStateAndDisplay[State.Continue](3)
+      .recover { case e: TimeoutException => BadRequest }
+
+  val wait13: Action[AnyContent] =
+    actions
+      .waitForStateAndDisplay[State.Continue](3)
+      .orApplyOnTimeout(_ => Transitions.showContinue(555))
+
+  val wait14: Action[AnyContent] =
+    actions
+      .waitForStateThenRedirect[State.Continue](3)
+
+  val wait15: Action[AnyContent] =
+    actions
+      .waitForStateThenRedirect[State.Continue](3)
+      .recover { case e: TimeoutException => BadRequest }
+
+  val wait16: Action[AnyContent] =
+    actions
+      .waitForStateThenRedirect[State.Continue](3)
+      .orApplyOnTimeout(_ => Transitions.showContinue(555))
+
+  val wait17: Action[AnyContent] =
+    actions
+      .waitForStateThenRedirect[State.Continue](3)
+      .orApplyOnTimeout(_ => Transitions.showContinue(555))
+      .display
+
+  val wait18: Action[AnyContent] =
+    actions
+      .waitForStateThenRedirect[State.Continue](3)
+      .orApplyOnTimeout(_ => Transitions.showContinue(555))
+      .redirectOrDisplayIf[State.Continue]
 
   val current1: Action[AnyContent] =
     actions.showCurrentState

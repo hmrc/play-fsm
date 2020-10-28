@@ -67,14 +67,26 @@ trait JourneyController[RequestContext] {
   type Route        = Request[_] => Result
   type RouteFactory = StateAndBreadcrumbs => Route
 
-  /** Displays template for the state and breadcrumbs, eventually override to change details */
+  /** Display the state using [[renderState]]. */
   val display: RouteFactory = (state: StateAndBreadcrumbs) =>
     (request: Request[_]) => renderState(state._1, state._2, None)(request)
 
-  /** Redirects to the endpoint matching state, eventually override to change details */
+  /** Redirect to the state using URL returned by [[getCallFor]]. */
   val redirect: RouteFactory =
     (state: StateAndBreadcrumbs) =>
       (request: Request[_]) => Results.Redirect(getCallFor(state._1)(request))
+
+  /**
+    * Is state is of type S then display the state using [[renderState]],
+    * otherwise redirect to the state using URL returned by [[getCallFor]].
+    */
+  def redirectOrDisplayIf[S <: State: ClassTag]: RouteFactory = {
+    case sb @ (state, breadcrumbs) =>
+      if (implicitly[ClassTag[S]].runtimeClass.isAssignableFrom(state.getClass))
+        display(sb)
+      else
+        redirect(sb)
+  }
 
   /** Returns a call to the previous state. */
   protected def backLinkFor(breadcrumbs: Breadcrumbs)(implicit request: Request[_]): Call =
@@ -582,7 +594,7 @@ trait JourneyController[RequestContext] {
   object actions {
 
     /**
-      * Displays the current state using default {{{renderState}}} function.
+      * Displays the current state using default [[renderState]] function.
       * If there is no state yet then redirects to the start.
       */
     val showCurrentState: Executable = new ShowCurrentState(implicit request =>
@@ -615,6 +627,9 @@ trait JourneyController[RequestContext] {
       * If the current state is not of type S,
       * try to rewind the history back to the nearest state matching S,
       * or redirect back to the root state.
+      *
+      * @note to alter behaviour follow with [[using]], [[orApply]] or [[orApplyWithRequest]]
+      *
       * @tparam S type of the state to display
       */
     def show[S <: State: ClassTag]: Show[S] = new Show[S]
@@ -733,7 +748,11 @@ trait JourneyController[RequestContext] {
       }
     }
 
-    /** Apply state transition and redirect to the new state. */
+    /**
+      * Apply state transition and redirect to the new state.
+      *
+      * @note to alter behaviour follow with [[redirectOrDisplayIfSame]] or [[redirectOrDisplayIf]]
+      */
     def apply(transition: Transition): Apply = new Apply(transition)
 
     final class Apply private[actions] (transition: Transition) extends Executable {
@@ -767,7 +786,7 @@ trait JourneyController[RequestContext] {
       final class RedirectOrDisplayIf[S <: State: ClassTag] private[actions] () extends Executable {
         override def execute(implicit request: Request[_], ec: ExecutionContext): Future[Result] = {
           implicit val rc: RequestContext = JourneyController.this.context(request)
-          JourneyController.this.applyAndMatch(transition) { case s: S => }
+          JourneyController.this.apply(transition, JourneyController.this.redirectOrDisplayIf[S])
         }
       }
     }
@@ -808,7 +827,8 @@ trait JourneyController[RequestContext] {
       final class RedirectOrDisplayIf[S <: State: ClassTag] private[actions] () extends Executable {
         override def execute(implicit request: Request[_], ec: ExecutionContext): Future[Result] = {
           implicit val rc: RequestContext = JourneyController.this.context(request)
-          JourneyController.this.applyAndMatch(transition(request)) { case s: S => }
+          JourneyController.this
+            .apply(transition(request), JourneyController.this.redirectOrDisplayIf[S])
         }
       }
     }
@@ -895,46 +915,85 @@ trait JourneyController[RequestContext] {
 
     /**
       * Wait until the state becomes of S type and display it,
-      * or if timeout expires raise a {{{java.util.concurrent.TimeoutException}}}.
+      * or if timeout expires raise a [[java.util.concurrent.TimeoutException]].
       */
     def waitForStateAndDisplay[S <: State: ClassTag](timeoutInSeconds: Int): WaitFor[S] =
       new WaitFor[S](timeoutInSeconds)(display)
 
     /**
       * Wait until the state becomes of S type and redirect to it,
-      * or if timeout expires raise a {{{java.util.concurrent.TimeoutException}}}.
+      * or if timeout expires raise a [[java.util.concurrent.TimeoutException]].
       */
-    def waitForStateAndRedirect[S <: State: ClassTag](timeoutInSeconds: Int): WaitFor[S] =
+    def waitForStateThenRedirect[S <: State: ClassTag](timeoutInSeconds: Int): WaitFor[S] =
       new WaitFor[S](timeoutInSeconds)(redirect)
 
     final class WaitFor[S <: State: ClassTag] private[actions] (timeoutInSeconds: Int)(
       routeFactory: RouteFactory
     ) extends Executable {
-      override def execute(implicit request: Request[_], ec: ExecutionContext): Future[Result] = {
+      override def execute(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+        waitForUsing(_ => Future.failed(new TimeoutException))
+
+      private def waitForUsing(
+        ifTimeout: Request[_] => Future[Result]
+      )(implicit request: Request[_], ec: ExecutionContext): Future[Result] = {
         implicit val rc: RequestContext = JourneyController.this.context(request)
         val maxTimestamp: Long          = System.nanoTime() + timeoutInSeconds * 1000000000L
-        JourneyController.this.waitFor[S](500, maxTimestamp)(routeFactory)(_ =>
-          Future.failed(new TimeoutException)
-        )
+        JourneyController.this.waitFor[S](500, maxTimestamp)(routeFactory)(ifTimeout)
       }
 
       /**
         * Wait until the state becomes of S type,
-        * or if timeout expires apply the transition and display/redirect.
+        * or if timeout expires apply the transition and redirect to the new state.
+        *
+        * @note follow with [[display]] or [[redirectOrDisplayIf]] to display instead of redirecting.
         */
-      def orApply(transition: Request[_] => Transition): OrApply = new OrApply(transition)
+      def orApplyOnTimeout(transition: Request[_] => Transition): OrApply =
+        new OrApply(transition)
 
       final class OrApply private[actions] (transition: Request[_] => Transition)
           extends Executable {
         override def execute(implicit
           request: Request[_],
           ec: ExecutionContext
-        ): Future[Result] = {
-          implicit val rc: RequestContext = JourneyController.this.context(request)
-          val maxTimestamp: Long          = System.nanoTime() + timeoutInSeconds * 1000000000L
-          JourneyController.this.waitFor[S](500, maxTimestamp)(routeFactory) { implicit request =>
-            JourneyController.this.apply(transition(request), routeFactory)
+        ): Future[Result] = orApplyUsing(redirect)
+
+        private def orApplyUsing(applyRouteFactory: RouteFactory)(implicit
+          request: Request[_],
+          ec: ExecutionContext
+        ): Future[Result] =
+          waitForUsing { implicit request =>
+            implicit val rc: RequestContext = JourneyController.this.context(request)
+            JourneyController.this.apply(transition(request), applyRouteFactory)
           }
+
+        /**
+          * Wait until the state becomes of S type,
+          * or if timeout expires apply the transition and display the new state.
+          */
+        def display: ThenDisplay = new ThenDisplay()
+
+        final class ThenDisplay private[actions] () extends Executable {
+          override def execute(implicit
+            request: Request[_],
+            ec: ExecutionContext
+          ): Future[Result] = orApplyUsing(JourneyController.this.display)
+        }
+
+        /**
+          * Wait until the state becomes of S type,
+          * or if timeout expires apply the transition
+          * and depending on the outcome either display the new state if of type S2,
+          * or redirect to the new state.
+          */
+        def redirectOrDisplayIf[S2 <: State: ClassTag]: ThenRedirectOrDisplayIf[S2] =
+          new ThenRedirectOrDisplayIf[S2]()
+
+        final class ThenRedirectOrDisplayIf[S2 <: State: ClassTag] private[actions] ()
+            extends Executable {
+          override def execute(implicit
+            request: Request[_],
+            ec: ExecutionContext
+          ): Future[Result] = orApplyUsing(JourneyController.this.redirectOrDisplayIf[S2])
         }
       }
     }
@@ -950,7 +1009,7 @@ trait JourneyController[RequestContext] {
     final class WhenAuthorised[User] private[actions] (withAuthorised: WithAuthorised[User]) {
 
       /**
-        * Displays the current state using default {{{renderState}}} function.
+        * Displays the current state using default [[renderState]] function.
         * If there is no state yet then redirects to the start.
         */
       val showCurrentState: Executable = new ShowCurrentState(implicit request =>
@@ -984,6 +1043,9 @@ trait JourneyController[RequestContext] {
         * If the current state is not of type S,
         * try to rewind the history back to the nearest state matching S,
         * or redirect back to the root state.
+        *
+        * @note to alter behaviour follow with [[using]], [[orApply]] or [[orApplyWithRequest]]
+        *
         * @tparam S type of the state to display
         */
       def show[S <: State: ClassTag]: Show[S] = new Show[S]
@@ -1127,6 +1189,8 @@ trait JourneyController[RequestContext] {
       /**
         * Apply state transition parametrized by the user information
         * and redirect to the URL matching the new state.
+        *
+        * @note to alter behaviour follow with [[redirectOrDisplayIfSame]] or [[redirectOrDisplayIf]]
         */
       def apply(transition: User => Transition): Apply = new Apply(transition)
 
@@ -1171,7 +1235,8 @@ trait JourneyController[RequestContext] {
           ): Future[Result] =
             withAuthorised(request) { user: User =>
               implicit val rc: RequestContext = JourneyController.this.context(request)
-              JourneyController.this.applyAndMatch(transition(user)) { case s: S => }
+              JourneyController.this
+                .apply(transition(user), JourneyController.this.redirectOrDisplayIf[S])
             }
         }
       }
@@ -1225,7 +1290,8 @@ trait JourneyController[RequestContext] {
           ): Future[Result] =
             withAuthorised(request) { user: User =>
               implicit val rc: RequestContext = JourneyController.this.context(request)
-              JourneyController.this.applyAndMatch(transition(request)(user)) { case s: S => }
+              JourneyController.this
+                .apply(transition(request)(user), JourneyController.this.redirectOrDisplayIf[S])
             }
         }
       }
@@ -1333,14 +1399,14 @@ trait JourneyController[RequestContext] {
 
       /**
         * Wait until the state becomes of S type and display it,
-        * or if timeout expires raise a {{{java.util.concurrent.TimeoutException}}}.
+        * or if timeout expires raise a [[java.util.concurrent.TimeoutException]].
         */
       def waitForStateAndDisplay[S <: State: ClassTag](timeoutInSeconds: Int): WaitFor[S] =
         new WaitFor[S](timeoutInSeconds)(display)
 
       /**
         * Wait until the state becomes of S type and redirect to it,
-        * or if timeout expires raise a {{{java.util.concurrent.TimeoutException}}}.
+        * or if timeout expires raise a [[java.util.concurrent.TimeoutException]].
         */
       def waitForStateAndRedirect[S <: State: ClassTag](timeoutInSeconds: Int): WaitFor[S] =
         new WaitFor[S](timeoutInSeconds)(redirect)
@@ -1349,34 +1415,72 @@ trait JourneyController[RequestContext] {
         routeFactory: RouteFactory
       ) extends Executable {
         override def execute(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+          waitForUsing(_ => _ => Future.failed(new TimeoutException))
+
+        private def waitForUsing(
+          ifTimeout: User => Request[_] => Future[Result]
+        )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
           withAuthorised(request) { user: User =>
             implicit val rc: RequestContext = JourneyController.this.context(request)
             val maxTimestamp: Long          = System.nanoTime() + timeoutInSeconds * 1000000000L
-            JourneyController.this.waitFor[S](500, maxTimestamp)(routeFactory)(_ =>
-              Future.failed(new TimeoutException)
-            )
+            JourneyController.this.waitFor[S](500, maxTimestamp)(routeFactory)(ifTimeout(user))
           }
 
         /**
           * Wait until the state becomes of S type,
-          * or if timeout expires apply the transition and display/redirect.
+          * or if timeout expires apply the transition and redirect to the new state.
+          *
+          * @note follow with [[display]] or [[redirectOrDisplayIf]] to display instead of redirecting.
           */
-        def orApply(transition: Request[_] => User => Transition): OrApply = new OrApply(transition)
+        def orApplyOnTimeout(transition: Request[_] => User => Transition): OrApply =
+          new OrApply(transition)
 
         final class OrApply private[actions] (transition: Request[_] => User => Transition)
             extends Executable {
           override def execute(implicit
             request: Request[_],
             ec: ExecutionContext
+          ): Future[Result] = orApplyUsing(redirect)
+
+          private def orApplyUsing(applyRouteFactory: RouteFactory)(implicit
+            request: Request[_],
+            ec: ExecutionContext
           ): Future[Result] =
-            withAuthorised(request) { user: User =>
+            waitForUsing { user => implicit request =>
               implicit val rc: RequestContext = JourneyController.this.context(request)
-              val maxTimestamp: Long          = System.nanoTime() + timeoutInSeconds * 1000000000L
-              JourneyController.this.waitFor[S](500, maxTimestamp)(routeFactory) {
-                implicit request =>
-                  JourneyController.this.apply(transition(request)(user), routeFactory)
-              }
+              JourneyController.this.apply(transition(request)(user), applyRouteFactory)
             }
+
+          /**
+            * Wait until the state becomes of S type,
+            * or if timeout expires apply the transition and display the state.
+            */
+          def display: ThenDisplay = new ThenDisplay()
+
+          final class ThenDisplay private[actions] () extends Executable {
+            override def execute(implicit
+              request: Request[_],
+              ec: ExecutionContext
+            ): Future[Result] = orApplyUsing(JourneyController.this.display)
+          }
+
+          /**
+            * Wait until the state becomes of S type,
+            * or if timeout expires apply the transition
+            * and depending on the outcome either display the new state if of type S2,
+            * or redirect to the new state.
+            */
+          def redirectOrDisplayIf[S2 <: State: ClassTag]: ThenRedirectOrDisplayIf[S2] =
+            new ThenRedirectOrDisplayIf[S2]()
+
+          final class ThenRedirectOrDisplayIf[S2 <: State: ClassTag] private[actions] ()
+              extends Executable {
+            override def execute(implicit
+              request: Request[_],
+              ec: ExecutionContext
+            ): Future[Result] = orApplyUsing(JourneyController.this.redirectOrDisplayIf[S2])
+          }
+
         }
       }
     }
@@ -1387,7 +1491,7 @@ trait JourneyController[RequestContext] {
   //-------------------------------------------------
 
   /**
-    * Prefer to use DSL {{{actions.show[ExpectedState]}}}
+    * Prefer to use DSL [[actions.show[ExpectedState]]]
     */
   protected final def actionShowState(
     expectedStates: ExpectedStates
@@ -1398,7 +1502,7 @@ trait JourneyController[RequestContext] {
     }
 
   /**
-    * Prefer to use DSL {{{actions.whenAuthorised(withAuthorised).show[ExpectedState]}}}
+    * Prefer to use DSL [[actions.whenAuthorised(withAuthorised).show[ExpectedState]]]
     */
   protected final def actionShowStateWhenAuthorised[User](
     withAuthorised: WithAuthorised[User]
