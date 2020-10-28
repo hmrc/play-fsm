@@ -92,9 +92,14 @@ trait JourneyController[RequestContext] {
   protected def backLinkFor(breadcrumbs: Breadcrumbs)(implicit request: Request[_]): Call =
     breadcrumbs.headOption.map(getCallFor).getOrElse(getCallFor(journeyService.model.root))
 
-  /** Returns a call to the latest state of S type. */
+  /**
+    * Returns a call to the latest state of S type if exists,
+    * otherwise returns a fallback call if defined,
+    * or a call to the root state.
+    */
   protected def backLinkToMostRecent[S <: State: ClassTag](
-    breadcrumbs: Breadcrumbs
+    breadcrumbs: Breadcrumbs,
+    fallback: Option[Call] = None
   )(implicit request: Request[_]): Call =
     breadcrumbs
       .find {
@@ -102,7 +107,7 @@ trait JourneyController[RequestContext] {
         case _    => false
       }
       .map(getCallFor)
-      .getOrElse(getCallFor(journeyService.model.root))
+      .getOrElse(fallback.getOrElse(getCallFor(journeyService.model.root)))
 
   //-------------------------------------------------
   // TRANSITION HELPERS
