@@ -94,6 +94,14 @@ class DummyJourneyControllerSpec
       journeyState.get           should have[State](State.Start, Nil)
     }
 
+    "dsl+merge+redirect: after GET /start transition to Start when uninitialized" in {
+      journeyState.clear
+      val result = controller.showStartDsl4(fakeRequest)
+      status(result)           shouldBe 303
+      redirectLocation(result) shouldBe Some("/start")
+      journeyState.get           should have[State](State.Start, Nil)
+    }
+
     "after GET /start show Start when in Start" in {
       journeyState.set(State.Start, Nil)
       val result = controller.showStart(fakeRequest)
@@ -119,6 +127,13 @@ class DummyJourneyControllerSpec
       journeyState.set(State.Start, Nil)
       val result = controller.showStartDsl3(fakeRequest)
       status(result) shouldBe 200
+      journeyState.get should have[State](State.Start, Nil)
+    }
+
+    "dsl+merge+redirect: after GET /start show Start when in Start" in {
+      journeyState.set(State.Start, Nil)
+      val result = controller.showStartDsl4(fakeRequest)
+      status(result) shouldBe 303
       journeyState.get should have[State](State.Start, Nil)
     }
 

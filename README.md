@@ -251,7 +251,9 @@ Inside your `XYZController extends JourneyController[MyContext]` implement:
 or
 ```
     val showCurrent: Action[AnyContent] = 
-        actions.showCurrentStateUsing(implicit request => renderState2)
+        actions
+            .showCurrentState
+            .displayUsing(implicit request => renderState2)
 ```
 
 - render the state matching the pattern (type), eventually rolling the history back
@@ -375,7 +377,7 @@ or
 
     val stop: Action[AnyContent] = 
         actions
-            .waitForStateAndRedirect[State.continue](30) //seconds
+            .waitForStateThenRedirect[State.continue](30) //seconds
             .orApply(Transitions.forceContinue)       
 ```
 
@@ -458,7 +460,8 @@ or
     val showCurrent: Action[AnyContent] = 
         actions
         .whenAuthorised(asUser)
-        .showCurrentStateUsing(implicit request => renderState2)
+        .showCurrentState
+        .displayUsing(implicit request => renderState2)
 ```
 
 - display or redirect only when user has been authorized
