@@ -364,7 +364,14 @@ or
     val stop: Action[AnyContent] = 
         actions
             .apply(Transitions.stop)
-            .renderUsing(implicit request => someRenderState2)
+            .displayUsing(implicit request => someRenderState2)
+```
+or 
+```
+    val stop: Action[AnyContent] = 
+        actions
+            .show[State.Stop]
+            .displayUsing(implicit request => someRenderState2)
 ```
 
 - wait for an async change of state (e.g. waiting for a backend callback)
