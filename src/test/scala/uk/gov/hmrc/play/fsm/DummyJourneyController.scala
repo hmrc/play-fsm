@@ -62,6 +62,12 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
   val showStartDsl3: Action[AnyContent] =
     actions.show[State.Start.type].using(Mergers.toStart)
 
+  val showStartDsl4: Action[AnyContent] =
+    actions
+      .show[State.Start.type]
+      .using(Mergers.toStart)
+      .redirect
+
   def continue: Action[AnyContent] =
     action { implicit request =>
       whenAuthorisedWithForm(asUser)(ArgForm)(Transitions.continue)
@@ -232,7 +238,7 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
       .whenAuthorised(asUser)
       .parseJson[TestPayload](ifFailure = _ => Future.successful(BadRequest))
       .apply(user => Transitions.processPayload)
-      .renderUsing(implicit request => renderState2)
+      .displayUsing(implicit request => renderState2)
       .recover { case _ => BadRequest }
       .transform { case BadRequest => NotFound }
 
@@ -256,31 +262,31 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
   val wait4: Action[AnyContent] =
     actions
       .whenAuthorised(asUser)
-      .waitForStateAndRedirect[State.Continue](3)
+      .waitForStateThenRedirect[State.Continue](3)
 
   val wait5: Action[AnyContent] =
     actions
       .whenAuthorised(asUser)
-      .waitForStateAndRedirect[State.Continue](3)
+      .waitForStateThenRedirect[State.Continue](3)
       .recover { case e: TimeoutException => BadRequest }
 
   val wait6: Action[AnyContent] =
     actions
       .whenAuthorised(asUser)
-      .waitForStateAndRedirect[State.Continue](3)
+      .waitForStateThenRedirect[State.Continue](3)
       .orApplyOnTimeout(_ => Transitions.showContinue)
 
   val wait7: Action[AnyContent] =
     actions
       .whenAuthorised(asUser)
-      .waitForStateAndRedirect[State.Continue](3)
+      .waitForStateThenRedirect[State.Continue](3)
       .orApplyOnTimeout(_ => Transitions.showContinue)
       .display
 
   val wait8: Action[AnyContent] =
     actions
       .whenAuthorised(asUser)
-      .waitForStateAndRedirect[State.Continue](3)
+      .waitForStateThenRedirect[State.Continue](3)
       .orApplyOnTimeout(_ => Transitions.showContinue)
       .redirectOrDisplayIf[State.Continue]
 
@@ -328,8 +334,8 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
     actions.showCurrentState
 
   val current2: Action[AnyContent] =
-    actions
-      .showCurrentStateUsing(implicit request => renderState2)
+    actions.showCurrentState
+      .displayUsing(implicit request => renderState2)
 
   val current3: Action[AnyContent] =
     actions
@@ -339,7 +345,8 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
   val current4: Action[AnyContent] =
     actions
       .whenAuthorised(asUser)
-      .showCurrentStateUsing(implicit request => renderState2)
+      .showCurrentState
+      .displayUsing(implicit request => renderState2)
 
   def backlink1(implicit request: Request[_]) =
     backLinkToMostRecent[State.Continue](
