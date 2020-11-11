@@ -268,14 +268,14 @@ class DummyJourneyControllerSpec
 
     "dsl: after GET /continue show Continue when in Continue" in {
       journeyState.set(State.Continue("dummy"), List(State.Start))
-      val result = controller.showContinueDsl(fakeRequest)
+      val result = controller.showWithRollbackContinueDsl(fakeRequest)
       status(result) shouldBe 200
       journeyState.get should have[State](State.Continue("dummy"), List(State.Start))
     }
 
     "dsl+merge: after GET /continue show Continue when in Continue" in {
       journeyState.set(State.Continue("dummy"), List(State.Start))
-      val result = controller.showContinueDsl2(fakeRequest)
+      val result = controller.showWithRollbackContinueDsl2(fakeRequest)
       status(result) shouldBe 200
       journeyState.get should have[State](State.Continue("dummy"), List(State.Start))
     }
@@ -289,12 +289,22 @@ class DummyJourneyControllerSpec
 
     "dsl: after GET /continue show previous Continue when in Stop" in {
       journeyState.set(State.Stop("dummy"), List(State.Continue("dummy"), State.Start))
-      val result = controller.showContinueDsl(fakeRequest)
+      val result = controller.showWithRollbackContinueDsl(fakeRequest)
       status(result) shouldBe 200
       journeyState.get should have[State](State.Continue("dummy"), List(State.Start))
     }
 
-    "dsl+apply: after GET /continue show new Continue when in Start" in {
+    "show+rollback+apply: after GET /continue show new Continue when in Start" in {
+      journeyState.set(State.Start, Nil)
+      val result = controller.showWithRollbackOrApplyContinueDsl(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](
+        State.Continue("yummy"),
+        List(State.Start)
+      )
+    }
+
+    "show+apply: after GET /continue show new Continue when in Start" in {
       journeyState.set(State.Start, Nil)
       val result = controller.showOrApplyContinueDsl(fakeRequest)
       status(result) shouldBe 200
@@ -304,16 +314,57 @@ class DummyJourneyControllerSpec
       )
     }
 
-    "dsl+apply: after GET /continue show Continue when in Continue" in {
+    "show+rollback+apply2: after GET /continue show new Continue when in Start" in {
+      journeyState.set(State.Start, Nil)
+      val result = controller.showWithRollbackOrApplyContinueDsl2(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](
+        State.Continue("yummy"),
+        List(State.Start)
+      )
+    }
+
+    "show+apply2: after GET /continue show new Continue when in Start" in {
+      journeyState.set(State.Start, Nil)
+      val result = controller.showOrApplyContinueDsl2(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](
+        State.Continue("yummy"),
+        List(State.Start)
+      )
+    }
+
+    "show+rollback+apply: after GET /continue show Continue when in Continue" in {
+      journeyState.set(State.Continue("dummy"), List(State.Start))
+      val result = controller.showWithRollbackOrApplyContinueDsl(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](State.Continue("dummy"), List(State.Start))
+    }
+
+    "show+apply: after GET /continue show Continue when in Continue" in {
       journeyState.set(State.Continue("dummy"), List(State.Start))
       val result = controller.showOrApplyContinueDsl(fakeRequest)
       status(result) shouldBe 200
       journeyState.get should have[State](State.Continue("dummy"), List(State.Start))
     }
 
-    "dsl+apply: after GET /continue show new Continue when in Stop" in {
+    "show+rollback+apply2: after GET /continue show Continue when in Continue" in {
+      journeyState.set(State.Continue("dummy"), List(State.Start))
+      val result = controller.showWithRollbackOrApplyContinueDsl2(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](State.Continue("dummy"), List(State.Start))
+    }
+
+    "show+apply2: after GET /continue show Continue when in Continue" in {
+      journeyState.set(State.Continue("dummy"), List(State.Start))
+      val result = controller.showOrApplyContinueDsl2(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](State.Continue("dummy"), List(State.Start))
+    }
+
+    "show+rollback+apply: after GET /continue show new Continue when in Stop" in {
       journeyState.set(State.Stop("dummy"), List(State.Continue("dummy"), State.Start))
-      val result = controller.showOrApplyContinueDsl(fakeRequest)
+      val result = controller.showWithRollbackOrApplyContinueDsl(fakeRequest)
       status(result) shouldBe 200
       journeyState.get should have[State](
         State.Continue("dummy"),
@@ -321,9 +372,39 @@ class DummyJourneyControllerSpec
       )
     }
 
+    "show+apply: after GET /continue show new Continue when in Stop" in {
+      journeyState.set(State.Stop("dummy"), List(State.Continue("dummy"), State.Start))
+      val result = controller.showOrApplyContinueDsl(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](
+        State.Continue("ymmud"),
+        List(State.Stop("dummy"), State.Continue("dummy"), State.Start)
+      )
+    }
+
+    "show+rollback+apply2: after GET /continue show new Continue when in Stop" in {
+      journeyState.set(State.Stop("dummy"), List(State.Continue("dummy"), State.Start))
+      val result = controller.showWithRollbackOrApplyContinueDsl2(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](
+        State.Continue("dummy"),
+        List(State.Start)
+      )
+    }
+
+    "show+apply2: after GET /continue show new Continue when in Stop" in {
+      journeyState.set(State.Stop("dummy"), List(State.Continue("dummy"), State.Start))
+      val result = controller.showOrApplyContinueDsl2(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](
+        State.Continue("ymmud"),
+        List(State.Stop("dummy"), State.Continue("dummy"), State.Start)
+      )
+    }
+
     "dsl+merge: after GET /continue show merged Continue when in Stop" in {
       journeyState.set(State.Stop("dummy"), List(State.Continue("dummy"), State.Start))
-      val result = controller.showContinueDsl2(fakeRequest)
+      val result = controller.showWithRollbackContinueDsl2(fakeRequest)
       status(result) shouldBe 200
       journeyState.get should have[State](
         State.Continue("dummy_dummy"),
@@ -340,14 +421,14 @@ class DummyJourneyControllerSpec
 
     "dsl: after GET /continue go to Start when in Stop but no breadcrumbs" in {
       journeyState.set(State.Stop("dummy"), Nil)
-      val result = controller.showContinueDsl(fakeRequest)
+      val result = controller.showWithRollbackContinueDsl(fakeRequest)
       status(result) shouldBe 303
       journeyState.get should have[State](State.Start, Nil)
     }
 
     "dsl2: after GET /continue show new Continue when in Stop but no breadcrumbs" in {
       journeyState.set(State.Stop("dummy"), Nil)
-      val result = controller.showOrApplyContinueDsl(fakeRequest)
+      val result = controller.showWithRollbackOrApplyContinueDsl(fakeRequest)
       status(result) shouldBe 200
       journeyState.get should have[State](State.Continue("ymmud"), List(State.Stop("dummy")))
     }

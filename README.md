@@ -1,7 +1,7 @@
-# play-fsm
-This library provides State Machine building blocks for a stateful Play application.
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/hmrc/play-fsm) ![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/hmrc/play-fsm)
 
-[ ![Download](https://api.bintray.com/packages/hmrc/releases/play-fsm/images/download.svg) ](https://bintray.com/hmrc/releases/play-fsm/_latestVersion)
+# play-fsm
+This library provides building blocks for a stateful Play Framework application.
 
 ## Table of contents
 
@@ -17,7 +17,7 @@ This library provides State Machine building blocks for a stateful Play applicat
 ## About
     
 ### Motivation
-Managing adequately stateful user journey through the complex business transaction is a challenge. 
+Implementing user journey through the stateful business process while preserving integrity and consistency of a data at each stage is a challenge. 
 It is even more of a challenge in a traditional server-oriented web application built on top of a stateless-by-design HTTP protocol.
 
 Common requirements are:
@@ -30,14 +30,15 @@ Common requirements are:
 - the testability of an application must not be compromised by the intrinsic implementation complexities
 
 ### Solution
-State Machine is an established pattern to manage complex internal state flow based on a set of transition rules. 
+Finite State Machine is an established pattern to model any non-trivial business process flow using states and transitions. 
+
 See <https://brilliant.org/wiki/finite-state-machines/>.
 
-In this library, you find a ready-to-use solution tailored for use in an HMRC-style frontend Play application, like `agent-invitations-frontend`. 
+In this library, you will find a ready-to-use solution tailored for use in an HMRC-style frontend Play application. 
 
 ### Design
 The key concept is a **Journey**.
-Each journey represents separate business transaction.
+Each journey represents separate business process/transaction.
 Each journey has a single root state.
 
 Journey is only loosely related to the HTTP and user session, in fact, depending on the state persistence
@@ -46,14 +47,13 @@ It is expected of an application to consist of one or more journeys.
 
 Journey is build out of **State**s, **Transition**s and **Merger**s. 
 
-**State** can be anything but usually it will be a set of case classes/objects representing the stage and data of a business transaction. 
-State is not expected to have finite values, can be continuous if needed!
+**State** can be anything but usually it will be a set of case classes or objects representing the progress and data of a business process or transaction.
 
 **Transition** is a means of moving forward from one state to the another. It's type is a partial async function `State => Future[State]`. 
 Transition should be a *pure* function, depending only on its own parameters and the current state. 
 External async requests to the upstream services should be provided as a function-type parameters. 
 
-**Merger** is a partial function of type `(S <: State, State) => S`, used to reconcile two states when going backward in the journey. 
+**Merger** is a partial function of type `(S <: State, State) => S`, used to reconcile current and previous states when rolling back the journey. 
 
 **Breadcrumbs** is a reversed list of previous states (the head is the last one) forming journey history.
 History is available only to the *service* and *controller* layers, *model* by design has no implicit knowledge of the history.
@@ -246,7 +246,9 @@ Inside your `XYZController extends JourneyController[MyContext]` implement:
 - render the current state
 
 ```
-    val showCurrent: Action[AnyContent] = actions.showCurrentState
+    val showCurrent: Action[AnyContent] = 
+        actions
+            .showCurrentState
 ```
 or
 ```
@@ -256,69 +258,76 @@ or
             .displayUsing(implicit request => renderState2)
 ```
 
-- render the state matching the pattern (type), eventually rolling the history back
+- render the current state if matches the type S
 
 ```
-    val showStart: Action[AnyContent] = actions.show[State.Start.type]
+    val showStart: Action[AnyContent] = 
+        actions
+            .show[State.Start.type]
 ```
-or
+
+- render the state matching the type S, eventually rolling the history back
+
 ```
-    val showStart: Action[AnyContent] = actionShowState {
-        case State.Start =>
-      }
+    val showStart: Action[AnyContent] = 
+        actions
+            .show[State.Start.type]
+            .orRollback
 ```
 
 - render the state matching the pattern (type), eventually rolling the history back and merging historic state with the current one
 
 ```
-    val showStart: Action[AnyContent] = actions
-        .show[State.Start.type]
-        .using(Mergers.toStart)
+    val showStart: Action[AnyContent] = 
+        actions
+            .show[State.Start.type]
+            .orRollbackUsing(Mergers.toStart)
 ```
 
 - render the current state if matches the pattern (type), eventually rolling the history back, otherwise apply the transition and display/redirect to the new state
 
 ```
-    val showStart: Action[AnyContent] = actions
-        .show[State.Start.type]
-        .orApply(Transitions.start)
+    val showStart: Action[AnyContent] = 
+        actions
+            .show[State.Start.type]
+            .orRollback
+            .orApply(Transitions.start)
 ```
 
 - render the current state if matches the pattern (type), eventually rolling the history back and merging historic state with the current one, otherwise apply the transition and display/redirect to the new state
 
 ```
-    val showStart: Action[AnyContent] = actions
-        .show[State.Start.type]
-        .using(Mergers.toStart)
-        .orApply(Transitions.start)
+    val showStart: Action[AnyContent] = 
+        actions
+            .show[State.Start.type]
+            .orRollbackUsing(Mergers.toStart)
+            .orApply(Transitions.start)
 ```
 
 - apply the transition to current state and redirect to the new state
 
 ```
-    val stop: Action[AnyContent] = actions.apply(Transitions.stop)
-```
-or
-```
-    val stop: Action[AnyContent] = action { implicit request =>
-        apply(Transitions.stop)(redirect)
-      }
+    val stop: Action[AnyContent] = 
+        actions
+            .apply(Transitions.stop)
 ```
 
 - apply the transition to current state and redirect to the new state if has changed, otherwise re-display the state
 
 ```
-    val stop: Action[AnyContent] = actions
-        .apply(Transitions.stop)
-        .redirectOrDisplayIfSame
+    val stop: Action[AnyContent] = 
+        actions
+            .apply(Transitions.stop)
+            .redirectOrDisplayIfSame
 ```
 
 - apply the transition to current state and display if new state is of expected type, otherwise redirect to the new state
 
 ```
-    val stop: Action[AnyContent] = actions
-        .apply(Transitions.stop)
-        .redirectOrDisplayIf[State.Stop]
+    val stop: Action[AnyContent] =
+        actions
+            .apply(Transitions.stop)
+            .redirectOrDisplayIf[State.Stop]
 ```
 
 - bind the form and apply transition if success, otherwise redirect to the current page with failed form flashed in
@@ -344,18 +353,10 @@ or
 
 ```
     val showStart: Action[AnyContent] = 
-        actions.show[State.Start.type].andCleanBreadcrumbs()
-```
-or
-```
-    def showTheEndState = action { implicit request =>
-        showStateWhenAuthorised(AsUser) {
-          case _: State.TheEnd =>
-        }.andThen {
-          // clears journey history
-          case Success(_) => journeyService.cleanBreadcrumbs()
-        }
-      }
+        actions
+            .show[State.Start.type]
+            .orRollback
+            .andCleanBreadcrumbs()
 ```
 
 - use an alternative state renderer
@@ -371,6 +372,7 @@ or
     val stop: Action[AnyContent] = 
         actions
             .show[State.Stop]
+            .orRollback
             .displayUsing(implicit request => someRenderState2)
 ```
 
@@ -474,18 +476,21 @@ or
 - display or redirect only when user has been authorized
 
 ```
-    val stop: Action[AnyContent] = actions
-        .whenAuthorised(asUser)
-        .apply(Transitions.stop)
-        .redirectOrDisplayIfSame
+    val stop: Action[AnyContent] = 
+        actions
+            .whenAuthorised(asUser)
+            .apply(Transitions.stop)
+            .redirectOrDisplayIfSame
 ```
 
 - display page for an authorized user only
 
 ```
-    val showContinue: Action[AnyContent] = actions
-        .whenAuthorised(asUser)
-        .show[State.Continue]
+    val showContinue: Action[AnyContent] = 
+        actions
+            .whenAuthorised(asUser)
+            .show[State.Continue]
+            .orRollback
 ```
 or
 ```
@@ -497,18 +502,21 @@ or
 -  for an authorized user only, render the current state if matches the pattern (type), otherwise apply the transition and redirect to the resulting state
 
 ```
-    val showContinue: Action[AnyContent] = actions
-        .whenAuthorised(asUser)
-        .show[State.Continue]
-        .orApplyWithRequest(implicit request => Transitions.continue)
+    val showContinue: Action[AnyContent] = 
+        actions
+            .whenAuthorised(asUser)
+            .show[State.Continue]
+            .orRollback
+            .orApplyWithRequest(implicit request => Transitions.continue)
 ```
 
 - for an authorized user only, apply the transition to current state and redirect to the resulting state
 
 ```
-    val showContinue: Action[AnyContent] = actions
-        .whenAuthorised(asUser)
-        .show[State.Continue]
-        .using(Mergers.toContinue)
+    val showContinue: Action[AnyContent] = 
+        actions
+            .whenAuthorised(asUser)
+            .show[State.Continue]
+            .orRollbackUsing(Mergers.toContinue)
 ```
 
