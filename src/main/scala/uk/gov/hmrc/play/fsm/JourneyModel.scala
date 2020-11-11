@@ -19,15 +19,35 @@ package uk.gov.hmrc.play.fsm
 import scala.concurrent.Future
 
 /**
-  * JourneyModel is an abstract base of a process diagram definition in terms of Finite State Machine pattern.
+  * Journey Model is a base trait of a Finite State Machine,
+  * consisting of states and transitions modelling the logic
+  * of the business process flow.
   *
   * @see https://brilliant.org/wiki/finite-state-machines/
   */
 trait JourneyModel {
 
+  /**
+    * State can be anything but usually it will be a set of case classes or objects
+    * representing the progress and data of a business process or transaction.
+    */
   type State
 
-  final class Transition private (val apply: PartialFunction[State, Future[State]])
+  /**
+    * Transition from one state to the another.
+    *
+    * Transition should be always a *pure* function, depending only on its own parameters and the current state.
+    * External async requests to the upstream services should be provided as a function-type parameters.
+    */
+  final class Transition private (val apply: PartialFunction[State, Future[State]]) {
+
+    /**
+      * Composes this transition with a fallback transition
+      * which gets applied where this transition is not defined for the curent state.
+      */
+    def orElse(other: Transition): Transition =
+      Transition(apply.orElse(other.apply))
+  }
 
   /** Transition builder helper */
   protected object Transition {
@@ -37,6 +57,10 @@ trait JourneyModel {
   case class TransitionNotAllowed(state: State, breadcrumbs: List[State], transition: Transition)
       extends Exception
 
+  /**
+    * Merger is a partial function of type `(S <: State, State) => S`,
+    * used to reconcile current and previous states when rolling back the journey.
+    */
   final class Merger[S <: State] private (val apply: PartialFunction[(S, State), S]) {
 
     /**

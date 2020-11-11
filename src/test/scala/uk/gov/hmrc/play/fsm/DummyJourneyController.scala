@@ -20,7 +20,6 @@ import play.api.data.Form
 import play.api.data.Forms.{single, text}
 import play.api.mvc._
 import play.twirl.api.Html
-import uk.gov.hmrc.play.fsm.OptionalFormOps._
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -54,18 +53,25 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
   }
 
   val showStartDsl: Action[AnyContent] =
-    actions.show[State.Start.type]
+    actions
+      .show[State.Start.type]
+      .orRollback
 
   val showStartDsl2: Action[AnyContent] =
-    actions.show[State.Start.type].andCleanBreadcrumbs()
+    actions
+      .show[State.Start.type]
+      .orRollback
+      .andCleanBreadcrumbs()
 
   val showStartDsl3: Action[AnyContent] =
-    actions.show[State.Start.type].using(Mergers.toStart)
+    actions
+      .show[State.Start.type]
+      .orRollbackUsing(Mergers.toStart)
 
   val showStartDsl4: Action[AnyContent] =
     actions
       .show[State.Start.type]
-      .using(Mergers.toStart)
+      .orRollbackUsing(Mergers.toStart)
       .redirect
 
   def continue: Action[AnyContent] =
@@ -74,23 +80,52 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
     }
 
   def continueDsl: Action[AnyContent] =
-    actions.whenAuthorised(asUser).bindForm(ArgForm).apply(Transitions.continue)
+    actions
+      .whenAuthorised(asUser)
+      .bindForm(ArgForm)
+      .apply(Transitions.continue)
 
   def continueDsl2: Action[AnyContent] =
-    actions.whenAuthorised(asUser).bindForm(ArgForm).applyWithRequest(_ => Transitions.continue)
+    actions
+      .whenAuthorised(asUser)
+      .bindForm(ArgForm)
+      .applyWithRequest(_ => Transitions.continue)
 
   val showContinue: Action[AnyContent] = actionShowStateWhenAuthorised(asUser) {
     case State.Continue(_) =>
   }
 
-  val showContinueDsl: Action[AnyContent] =
-    actions.whenAuthorised(asUser).show[State.Continue]
+  val showWithRollbackContinueDsl: Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .show[State.Continue]
+      .orRollback
 
-  val showContinueDsl2: Action[AnyContent] =
-    actions.whenAuthorised(asUser).show[State.Continue].using(Mergers.toContinue)
+  val showWithRollbackContinueDsl2: Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .show[State.Continue]
+      .orRollbackUsing(Mergers.toContinue)
+
+  val showWithRollbackOrApplyContinueDsl: Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .show[State.Continue]
+      .orRollback
+      .orApply(Transitions.showContinue)
 
   val showOrApplyContinueDsl: Action[AnyContent] =
-    actions.whenAuthorised(asUser).show[State.Continue].orApply(Transitions.showContinue)
+    actions
+      .whenAuthorised(asUser)
+      .show[State.Continue]
+      .orApply(Transitions.showContinue)
+
+  val showWithRollbackOrApplyContinueDsl2: Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .show[State.Continue]
+      .orRollback
+      .orApplyWithRequest(implicit request => Transitions.showContinue)
 
   val showOrApplyContinueDsl2: Action[AnyContent] =
     actions
@@ -102,7 +137,10 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
     whenAuthorised(asUser)(Transitions.stop)(redirect)
   }
 
-  val stopDsl: Action[AnyContent] = actions.whenAuthorised(asUser).apply(Transitions.stop)
+  val stopDsl: Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .apply(Transitions.stop)
 
   val stopDsl2: Action[AnyContent] =
     actions
@@ -179,10 +217,16 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
     case State.Stop(_) =>
   }
 
-  val showStopDsl: Action[AnyContent] = actions.whenAuthorised(asUser).show[State.Stop]
+  val showStopDsl: Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .show[State.Stop]
 
   val showStopDsl2: Action[AnyContent] =
-    actions.whenAuthorised(asUser).show[State.Stop].andCleanBreadcrumbs()
+    actions
+      .whenAuthorised(asUser)
+      .show[State.Stop]
+      .andCleanBreadcrumbs()
 
   def dummyFx(s: String)(implicit dc: DummyContext): String = s
 
@@ -191,34 +235,34 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
   val showDeadEndDsl: Action[AnyContent] =
     actions
       .show[State.DeadEnd]
-      .using(Mergers.toDeadEnd)
+      .orRollbackUsing(Mergers.toDeadEnd)
       .orApplyWithRequest(implicit request => Transitions.toDeadEnd(dummyFx))
 
   val showDeadEndDsl1: Action[AnyContent] =
     actions
       .show[State.DeadEnd]
-      .using(Mergers.toDeadEnd)
+      .orRollbackUsing(Mergers.toDeadEnd)
       .orApply(Transitions.toDeadEnd(dummyFx2))
 
   val showDeadEndDsl2: Action[AnyContent] =
     actions
       .whenAuthorised(asUser)
       .show[State.DeadEnd]
-      .using(Mergers.toDeadEnd)
+      .orRollbackUsing(Mergers.toDeadEnd)
       .orApplyWithRequest(implicit request => user => Transitions.toDeadEnd(dummyFx))
 
   val showDeadEndDsl4: Action[AnyContent] =
     actions
       .whenAuthorised(asUser)
       .show[State.DeadEnd]
-      .using(Mergers.toDeadEnd)
+      .orRollbackUsing(Mergers.toDeadEnd)
       .orApply(user => Transitions.toDeadEnd(dummyFx2))
 
   val showDeadEndDsl3: Action[AnyContent] =
     actions
       .whenAuthorised(asUser)
       .show[State.DeadEnd]
-      .using(Mergers.toDeadEnd)
+      .orRollbackUsing(Mergers.toDeadEnd)
 
   val parseJson1: Action[AnyContent] =
     actions
