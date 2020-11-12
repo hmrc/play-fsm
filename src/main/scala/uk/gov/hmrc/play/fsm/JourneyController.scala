@@ -64,12 +64,20 @@ trait JourneyController[RequestContext] {
   )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
     body
 
+  //-------------------------------------------------
+  // INTERNAL TYPE ALIASES
+  //-------------------------------------------------
+
   type Route        = Request[_] => Result
   type RouteFactory = StateAndBreadcrumbs => Route
   type Renderer     = Request[_] => (State, Breadcrumbs, Option[Form[_]]) => Result
 
   protected final def is[S <: State: ClassTag](state: State): Boolean =
     implicitly[ClassTag[S]].runtimeClass.isAssignableFrom(state.getClass)
+
+  //-------------------------------------------------
+  // ROUTE FACTORIES
+  //-------------------------------------------------
 
   /** Display the current state using [[renderState]]. */
   protected final val display: RouteFactory = (state: StateAndBreadcrumbs) =>
@@ -146,6 +154,10 @@ trait JourneyController[RequestContext] {
       if (state == origin) displayUsing(renderState)(sb) else redirect(sb)
   }
 
+  //-------------------------------------------------
+  // BACKLINK HELPERS
+  //-------------------------------------------------
+
   /** Returns a call to the previous state. */
   protected final def backLinkFor(breadcrumbs: Breadcrumbs)(implicit request: Request[_]): Call =
     breadcrumbs.headOption.map(getCallFor).getOrElse(getCallFor(journeyService.model.root))
@@ -189,7 +201,7 @@ trait JourneyController[RequestContext] {
       }
 
   /** Default fallback result is to redirect back to the Start state. */
-  private def redirectToStart(implicit
+  protected final def redirectToStart(implicit
     rc: RequestContext,
     request: Request[_],
     ec: ExecutionContext
@@ -200,6 +212,21 @@ trait JourneyController[RequestContext] {
           .cleanBreadcrumbs(_ => Nil)
           .map(_ => result)
       )
+
+  /** Sync view, redirect back to the current state. */
+  protected final def redirectToCurrentState(implicit
+    rc: RequestContext,
+    request: Request[_],
+    ec: ExecutionContext
+  ): Future[Result] =
+    journeyService.currentState
+      .flatMap {
+        case Some(sb) =>
+          Future.successful(redirect(sb)(request))
+
+        case None =>
+          apply(journeyService.model.start, redirect)
+      }
 
   //-------------------------------------------------
   // STATE RENDERING HELPERS
@@ -218,8 +245,8 @@ trait JourneyController[RequestContext] {
     expectedStates: ExpectedStates
   )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
     for {
-      stateAndBreadcrumbsOpt <- journeyService.currentState
-      result <- stateAndBreadcrumbsOpt match {
+      sbopt <- journeyService.currentState
+      result <- sbopt match {
                   case None => redirectToStart
                   case Some(stateAndBreadcrumbs) =>
                     if (hasState(expectedStates, stateAndBreadcrumbs))
@@ -242,23 +269,24 @@ trait JourneyController[RequestContext] {
     */
   protected final def showState[S <: State: ClassTag](
     routeFactory: RouteFactory,
-    rollback: Boolean = true
+    rollback: Boolean = true,
+    fallback: => Future[Result]
   )(implicit
     rc: RequestContext,
     request: Request[_],
     ec: ExecutionContext
   ): Future[Result] =
     for {
-      sb <- journeyService.currentState
-      result <- sb match {
-                  case Some((state, breadcrumbs)) if is[S](state) =>
-                    Future.successful(routeFactory((state, breadcrumbs))(request))
+      sbopt <- journeyService.currentState
+      result <- sbopt match {
+                  case Some(sb @ (state, breadcrumbs)) if is[S](state) =>
+                    Future.successful(routeFactory(sb)(request))
 
                   case Some((state, breadcrumbs)) if `rollback` && hasRecentState[S](breadcrumbs) =>
-                    rollbackTo[S](redirectToStart, routeFactory)(sb)
+                    rollbackTo[S](fallback, routeFactory)(sbopt)
 
                   case _ =>
-                    redirectToStart
+                    fallback
                 }
     } yield result
 
@@ -282,13 +310,13 @@ trait JourneyController[RequestContext] {
     rollback: Boolean
   )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
     for {
-      sb <- journeyService.currentState
-      result <- sb match {
+      sbopt <- journeyService.currentState
+      result <- sbopt match {
                   case Some(sb @ (state, breadcrumbs)) if is[S](state) =>
                     Future.successful(routeFactory(sb)(request))
 
                   case Some((state, breadcrumbs)) if `rollback` && hasRecentState[S](breadcrumbs) =>
-                    rollbackTo[S](apply(transition, routeFactory), routeFactory)(sb)
+                    rollbackTo[S](apply(transition, routeFactory), routeFactory)(sbopt)
 
                   case _ =>
                     apply(transition, routeFactory)
@@ -304,16 +332,19 @@ trait JourneyController[RequestContext] {
     */
   protected final def showStateWithRollbackUsingMerger[S <: State: ClassTag](
     merger: Merger[S],
-    routeFactory: RouteFactory
+    routeFactory: RouteFactory,
+    fallback: => Future[Result]
   )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
     for {
-      sb <- journeyService.currentState
-      result <- sb match {
+      sbopt <- journeyService.currentState
+      result <- sbopt match {
                   case Some((state, breadcrumbs))
                       if is[S](state) || hasRecentState[S](breadcrumbs) =>
-                    rollbackAndModify[S](merger.withState(state))(redirectToStart, routeFactory)(sb)
+                    rollbackAndModify[S](merger.withState(state))(fallback, routeFactory)(
+                      sbopt
+                    )
                   case _ =>
-                    redirectToStart
+                    fallback
                 }
     } yield result
 
@@ -443,7 +474,7 @@ trait JourneyController[RequestContext] {
     }
 
   //-------------------------------------------------
-  // FORM BINDING HELPERS
+  // BINDING HELPERS
   //-------------------------------------------------
 
   /**
@@ -452,8 +483,23 @@ trait JourneyController[RequestContext] {
     */
   protected final def bindForm[T](
     form: Form[T],
+    transition: T => Transition
+  )(implicit
+    rc: RequestContext,
+    request: Request[_],
+    ec: ExecutionContext
+  ): Future[Result] =
+    bindForm(form, transition, redirect, redirectToStart)
+
+  /**
+    * Bind form and apply transition if success,
+    * otherwise redirect to the current state with form errors in the flash scope.
+    */
+  protected final def bindForm[T](
+    form: Form[T],
     transition: T => Transition,
-    routeFactory: RouteFactory = redirect
+    routeFactory: RouteFactory,
+    fallback: => Future[Result]
   )(implicit
     rc: RequestContext,
     request: Request[_],
@@ -475,7 +521,7 @@ trait JourneyController[RequestContext] {
                   })
               )
             case None =>
-              redirectToStart
+              fallback
           },
         userInput => apply(transition(userInput), routeFactory)
       )
@@ -861,7 +907,11 @@ trait JourneyController[RequestContext] {
       *
       * @tparam S type of the state to display
       */
-    def show[S <: State: ClassTag]: Show[S] = new Show[S](rollback = false, merger = None)
+    def show[S <: State: ClassTag]: Show[S] =
+      new Show[S](
+        rollback = false,
+        merger = None
+      )
 
     final class Show[S <: State: ClassTag] private[actions] (
       rollback: Boolean,
@@ -878,10 +928,11 @@ trait JourneyController[RequestContext] {
         val routeFactory                = settings.routeFactoryWithDefault(defaultRouteFactory)
         merger match {
           case None =>
-            JourneyController.this.showState[S](routeFactory, rollback)
+            JourneyController.this.showState[S](routeFactory, rollback, redirectToStart)
 
           case Some(m) =>
-            JourneyController.this.showStateWithRollbackUsingMerger[S](m, routeFactory)
+            JourneyController.this
+              .showStateWithRollbackUsingMerger[S](m, routeFactory, redirectToStart)
         }
       }
 
@@ -1032,7 +1083,8 @@ trait JourneyController[RequestContext] {
           JourneyController.this.bindForm(
             form,
             transition,
-            settings.routeFactoryWithDefault(JourneyController.this.redirect)
+            settings.routeFactoryWithDefault(JourneyController.this.redirect),
+            redirectToStart
           )
         }
       }
@@ -1054,7 +1106,8 @@ trait JourneyController[RequestContext] {
           JourneyController.this.bindForm(
             form,
             transition(request),
-            settings.routeFactoryWithDefault(JourneyController.this.redirect)
+            settings.routeFactoryWithDefault(JourneyController.this.redirect),
+            redirectToStart
           )
         }
       }
@@ -1110,11 +1163,21 @@ trait JourneyController[RequestContext] {
     }
 
     /**
-      * Wait until the state becomes of S type and display it,
+      * Wait until the state becomes of S type and display it using default [[renderState]],
       * or if timeout expires raise a [[java.util.concurrent.TimeoutException]].
       */
     def waitForStateAndDisplay[S <: State: ClassTag](timeoutInSeconds: Int): WaitFor[S] =
       new WaitFor[S](timeoutInSeconds)(display)
+
+    /**
+      * Wait until the state becomes of S type and display it using custom renderer,
+      * or if timeout expires raise a [[java.util.concurrent.TimeoutException]].
+      */
+    def waitForStateAndDisplayUsing[S <: State: ClassTag](
+      timeoutInSeconds: Int,
+      renderer: Renderer
+    ): WaitFor[S] =
+      new WaitFor[S](timeoutInSeconds)(displayUsing(renderer))
 
     /**
       * Wait until the state becomes of S type and redirect to it,
@@ -1129,10 +1192,14 @@ trait JourneyController[RequestContext] {
       override def execute(
         settings: Settings
       )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
-        waitForUsing(_ => Future.failed(new TimeoutException))
+        waitForUsing(
+          _ => Future.failed(new TimeoutException),
+          routeFactory
+        )
 
       private def waitForUsing(
-        ifTimeout: Request[_] => Future[Result]
+        ifTimeout: Request[_] => Future[Result],
+        routeFactory: RouteFactory
       )(implicit request: Request[_], ec: ExecutionContext): Future[Result] = {
         implicit val rc: RequestContext = JourneyController.this.context(request)
         val maxTimestamp: Long          = System.nanoTime() + timeoutInSeconds * 1000000000L
@@ -1156,14 +1223,16 @@ trait JourneyController[RequestContext] {
           request: Request[_],
           ec: ExecutionContext
         ): Future[Result] =
-          waitForUsing { implicit request =>
-            implicit val rc: RequestContext = JourneyController.this.context(request)
-            JourneyController.this.apply(
-              transition(request),
-              settings.routeFactoryOpt.getOrElse(JourneyController.this.redirect)
-            )
-          }
-
+          waitForUsing(
+            { implicit request =>
+              implicit val rc: RequestContext = JourneyController.this.context(request)
+              JourneyController.this.apply(
+                transition(request),
+                settings.routeFactoryOpt.getOrElse(JourneyController.this.redirect)
+              )
+            },
+            routeFactory
+          )
       }
     }
 
@@ -1228,10 +1297,11 @@ trait JourneyController[RequestContext] {
             val routeFactory = settings.routeFactoryWithDefault(defaultRouteFactory)
             merger match {
               case None =>
-                JourneyController.this.showState[S](routeFactory, rollback)
+                JourneyController.this.showState[S](routeFactory, rollback, redirectToStart)
 
               case Some(m) =>
-                JourneyController.this.showStateWithRollbackUsingMerger[S](m, routeFactory)
+                JourneyController.this
+                  .showStateWithRollbackUsingMerger[S](m, routeFactory, redirectToStart)
             }
 
           }
@@ -1411,7 +1481,8 @@ trait JourneyController[RequestContext] {
               JourneyController.this.bindForm(
                 form,
                 transition(user),
-                settings.routeFactoryWithDefault(JourneyController.this.redirect)
+                settings.routeFactoryWithDefault(JourneyController.this.redirect),
+                redirectToStart
               )
             }
         }
@@ -1436,7 +1507,8 @@ trait JourneyController[RequestContext] {
               JourneyController.this.bindForm(
                 form,
                 transition(request)(user),
-                settings.routeFactoryWithDefault(JourneyController.this.redirect)
+                settings.routeFactoryWithDefault(JourneyController.this.redirect),
+                redirectToStart
               )
             }
         }
@@ -1507,11 +1579,21 @@ trait JourneyController[RequestContext] {
       }
 
       /**
-        * Wait until the state becomes of S type and display it,
+        * Wait until the state becomes of S type and display it using default [[renderState]],
         * or if timeout expires raise a [[java.util.concurrent.TimeoutException]].
         */
       def waitForStateAndDisplay[S <: State: ClassTag](timeoutInSeconds: Int): WaitFor[S] =
         new WaitFor[S](timeoutInSeconds)(display)
+
+      /**
+        * Wait until the state becomes of S type and display it using custom renderer,
+        * or if timeout expires raise a [[java.util.concurrent.TimeoutException]].
+        */
+      def waitForStateAndDisplayUsing[S <: State: ClassTag](
+        timeoutInSeconds: Int,
+        renderer: Renderer
+      ): WaitFor[S] =
+        new WaitFor[S](timeoutInSeconds)(displayUsing(renderer))
 
       /**
         * Wait until the state becomes of S type and redirect to it,
@@ -1526,10 +1608,14 @@ trait JourneyController[RequestContext] {
         override def execute(
           settings: Settings
         )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
-          waitForUsing(_ => _ => Future.failed(new TimeoutException))
+          waitForUsing(
+            _ => _ => Future.failed(new TimeoutException),
+            routeFactory
+          )
 
         private def waitForUsing(
-          ifTimeout: User => Request[_] => Future[Result]
+          ifTimeout: User => Request[_] => Future[Result],
+          routeFactory: RouteFactory
         )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
           withAuthorised(request) { user: User =>
             implicit val rc: RequestContext = JourneyController.this.context(request)
@@ -1553,15 +1639,16 @@ trait JourneyController[RequestContext] {
           )(implicit
             request: Request[_],
             ec: ExecutionContext
-          ): Future[Result] =
-            waitForUsing { user => implicit request =>
+          ): Future[Result] = {
+            val f = { user: User => implicit request: Request[_] =>
               implicit val rc: RequestContext = JourneyController.this.context(request)
               JourneyController.this.apply(
                 transition(request)(user),
                 settings.routeFactoryOpt.getOrElse(JourneyController.this.redirect)
               )
             }
-
+            waitForUsing(f, routeFactory)
+          }
         }
       }
     }

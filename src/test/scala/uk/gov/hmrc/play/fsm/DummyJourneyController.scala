@@ -291,6 +291,11 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
       .whenAuthorised(asUser)
       .waitForStateAndDisplay[State.Continue](3)
 
+  val wait1_1: Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .waitForStateAndDisplayUsing[State.Continue](3, implicit request => renderState2)
+
   val wait2: Action[AnyContent] =
     actions
       .whenAuthorised(asUser)
@@ -337,6 +342,10 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
   val wait11: Action[AnyContent] =
     actions
       .waitForStateAndDisplay[State.Continue](3)
+
+  val wait11_1: Action[AnyContent] =
+    actions
+      .waitForStateAndDisplayUsing[State.Continue](3, implicit request => renderState2)
 
   val wait12: Action[AnyContent] =
     actions

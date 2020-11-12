@@ -928,10 +928,33 @@ class DummyJourneyControllerSpec
       )
     }
 
+    "dsl1_1: after GET /wait show Continue when ready" in {
+      journeyState.set(State.Start, Nil)
+      Schedule(1000) {
+        Future {
+          journeyState.set(State.Continue("stop"), List(State.Start))
+        }
+      }
+      val result = controller.wait1_1(fakeRequest)
+      status(result) shouldBe 201
+      journeyState.get should have[State](
+        State.Continue("stop"),
+        List(State.Start)
+      )
+    }
+
     "dsl1: after GET /wait show 400 when timeout" in {
       journeyState.set(State.Start, Nil)
       an[TimeoutException] shouldBe thrownBy {
         await(controller.wait1(fakeRequest))
+      }
+      journeyState.get should have[State](State.Start, Nil)
+    }
+
+    "dsl1_1: after GET /wait show 400 when timeout" in {
+      journeyState.set(State.Start, Nil)
+      an[TimeoutException] shouldBe thrownBy {
+        await(controller.wait1_1(fakeRequest))
       }
       journeyState.get should have[State](State.Start, Nil)
     }
@@ -1124,10 +1147,33 @@ class DummyJourneyControllerSpec
       )
     }
 
+    "dsl11_1: after GET /wait show Continue when ready" in {
+      journeyState.set(State.Start, Nil)
+      Schedule(1000) {
+        Future {
+          journeyState.set(State.Continue("stop"), List(State.Start))
+        }
+      }
+      val result = controller.wait11_1(fakeRequest)
+      status(result) shouldBe 201
+      journeyState.get should have[State](
+        State.Continue("stop"),
+        List(State.Start)
+      )
+    }
+
     "dsl11: after GET /wait show 400 when timeout" in {
       journeyState.set(State.Start, Nil)
       an[TimeoutException] shouldBe thrownBy {
         await(controller.wait11(fakeRequest))
+      }
+      journeyState.get should have[State](State.Start, Nil)
+    }
+
+    "dsl11_1: after GET /wait show 400 when timeout" in {
+      journeyState.set(State.Start, Nil)
+      an[TimeoutException] shouldBe thrownBy {
+        await(controller.wait11_1(fakeRequest))
       }
       journeyState.get should have[State](State.Start, Nil)
     }
