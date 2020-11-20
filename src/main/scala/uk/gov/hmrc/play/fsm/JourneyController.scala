@@ -68,28 +68,28 @@ trait JourneyController[RequestContext] {
   // INTERNAL TYPE ALIASES
   //-------------------------------------------------
 
-  type Route        = Request[_] => Result
-  type RouteFactory = StateAndBreadcrumbs => Route
-  type Renderer     = Request[_] => (State, Breadcrumbs, Option[Form[_]]) => Result
+  type Outcome        = Request[_] => Result
+  type OutcomeFactory = StateAndBreadcrumbs => Outcome
+  type Renderer       = Request[_] => (State, Breadcrumbs, Option[Form[_]]) => Result
 
   protected final def is[S <: State: ClassTag](state: State): Boolean =
     implicitly[ClassTag[S]].runtimeClass.isAssignableFrom(state.getClass)
 
   //-------------------------------------------------
-  // ROUTE FACTORIES
+  // AVAILABLE OUTCOMES
   //-------------------------------------------------
 
   /** Display the current state using [[renderState]]. */
-  protected final val display: RouteFactory = (state: StateAndBreadcrumbs) =>
+  protected final val display: OutcomeFactory = (state: StateAndBreadcrumbs) =>
     (request: Request[_]) => renderState(state._1, state._2, None)(request)
 
   /** Display the current state using custom renderer. */
-  protected final def displayUsing(renderState: Renderer): RouteFactory =
+  protected final def displayUsing(renderState: Renderer): OutcomeFactory =
     (state: StateAndBreadcrumbs) =>
       (request: Request[_]) => renderState(request)(state._1, state._2, None)
 
   /** Redirect to the current state using URL returned by [[getCallFor]]. */
-  protected final val redirect: RouteFactory =
+  protected final val redirect: OutcomeFactory =
     (state: StateAndBreadcrumbs) =>
       (request: Request[_]) => Results.Redirect(getCallFor(state._1)(request))
 
@@ -97,7 +97,7 @@ trait JourneyController[RequestContext] {
     * If the current state is of type S then display using [[renderState]],
     * otherwise redirect using URL returned by [[getCallFor]].
     */
-  protected final def redirectOrDisplayIf[S <: State: ClassTag]: RouteFactory = {
+  protected final def redirectOrDisplayIf[S <: State: ClassTag]: OutcomeFactory = {
     case sb @ (state, breadcrumbs) =>
       if (is[S](state)) display(sb) else redirect(sb)
   }
@@ -108,7 +108,7 @@ trait JourneyController[RequestContext] {
     */
   protected final def redirectOrDisplayUsingIf[S <: State: ClassTag](
     renderState: Renderer
-  ): RouteFactory = {
+  ): OutcomeFactory = {
     case sb @ (state, breadcrumbs) =>
       if (is[S](state)) displayUsing(renderState)(sb) else redirect(sb)
   }
@@ -117,7 +117,7 @@ trait JourneyController[RequestContext] {
     * If the current state is of type S then redirect using URL returned by [[getCallFor]],
     * otherwise display using [[renderState]].
     */
-  protected final def displayOrRedirectIf[S <: State: ClassTag]: RouteFactory = {
+  protected final def displayOrRedirectIf[S <: State: ClassTag]: OutcomeFactory = {
     case sb @ (state, breadcrumbs) =>
       if (is[S](state)) redirect(sb) else display(sb)
   }
@@ -128,7 +128,7 @@ trait JourneyController[RequestContext] {
     */
   protected final def displayUsingOrRedirectIf[S <: State: ClassTag](
     renderState: Renderer
-  ): RouteFactory = {
+  ): OutcomeFactory = {
     case sb @ (state, breadcrumbs) =>
       if (is[S](state)) redirect(sb) else displayUsing(renderState)(sb)
   }
@@ -137,7 +137,7 @@ trait JourneyController[RequestContext] {
     * If the current state is same as the origin then display using [[renderState]],
     * otherwise redirect using URL returned by [[getCallFor]].
     */
-  protected final def redirectOrDisplayIfSame(origin: State): RouteFactory = {
+  protected final def redirectOrDisplayIfSame(origin: State): OutcomeFactory = {
     case sb @ (state, breadcrumbs) =>
       if (state == origin) display(sb) else redirect(sb)
   }
@@ -149,7 +149,7 @@ trait JourneyController[RequestContext] {
   protected final def redirectOrDisplayUsingIfSame(
     origin: State,
     renderState: Renderer
-  ): RouteFactory = {
+  ): OutcomeFactory = {
     case sb @ (state, breadcrumbs) =>
       if (state == origin) displayUsing(renderState)(sb) else redirect(sb)
   }
@@ -186,18 +186,18 @@ trait JourneyController[RequestContext] {
   /**
     * Apply state transition and redirect to the URL matching the new state.
     */
-  protected final def apply(transition: Transition, routeFactory: RouteFactory)(implicit
+  protected final def apply(transition: Transition, outcomeFactory: OutcomeFactory)(implicit
     rc: RequestContext,
     request: Request[_],
     ec: ExecutionContext
   ): Future[Result] =
     journeyService
       .apply(transition)
-      .map(routeFactory)
+      .map(outcomeFactory)
       .map(_(request))
       .recover {
         case TransitionNotAllowed(origin, breadcrumbs, _) =>
-          routeFactory((origin, breadcrumbs))(request) // renders current state back
+          outcomeFactory((origin, breadcrumbs))(request) // renders current state back
       }
 
   /** Default fallback result is to redirect back to the Start state. */
@@ -264,11 +264,11 @@ trait JourneyController[RequestContext] {
     * otherwise redirect back to the root state.
     *
     * @tparam S type of the state to display
-    * @param routeFactory route factory to use
+    * @param outcomeFactory outcome factory to use
     * @param whether to rollback to the most recent state of type S
     */
   protected final def showState[S <: State: ClassTag](
-    routeFactory: RouteFactory,
+    outcomeFactory: OutcomeFactory,
     rollback: Boolean = true,
     fallback: => Future[Result]
   )(implicit
@@ -280,10 +280,10 @@ trait JourneyController[RequestContext] {
       sbopt <- journeyService.currentState
       result <- sbopt match {
                   case Some(sb @ (state, breadcrumbs)) if is[S](state) =>
-                    Future.successful(routeFactory(sb)(request))
+                    Future.successful(outcomeFactory(sb)(request))
 
                   case Some((state, breadcrumbs)) if `rollback` && hasRecentState[S](breadcrumbs) =>
-                    rollbackTo[S](fallback, routeFactory)(sbopt)
+                    rollbackTo[S](fallback, outcomeFactory)(sbopt)
 
                   case _ =>
                     fallback
@@ -301,25 +301,25 @@ trait JourneyController[RequestContext] {
     *
     * @tparam S type of the state to display
     * @param transition transition to apply when state S not found
-    * @param routeFactory route factory to use
+    * @param outcomeFactory outcome factory to use
     * @param whether to rollback to the most recent state of type S
     */
   protected final def showStateOrApply[S <: State: ClassTag](
     transition: Transition,
-    routeFactory: RouteFactory,
+    outcomeFactory: OutcomeFactory,
     rollback: Boolean
   )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
     for {
       sbopt <- journeyService.currentState
       result <- sbopt match {
                   case Some(sb @ (state, breadcrumbs)) if is[S](state) =>
-                    Future.successful(routeFactory(sb)(request))
+                    Future.successful(outcomeFactory(sb)(request))
 
                   case Some((state, breadcrumbs)) if `rollback` && hasRecentState[S](breadcrumbs) =>
-                    rollbackTo[S](apply(transition, routeFactory), routeFactory)(sbopt)
+                    rollbackTo[S](apply(transition, outcomeFactory), outcomeFactory)(sbopt)
 
                   case _ =>
-                    apply(transition, routeFactory)
+                    apply(transition, outcomeFactory)
                 }
     } yield result
 
@@ -332,7 +332,7 @@ trait JourneyController[RequestContext] {
     */
   protected final def showStateWithRollbackUsingMerger[S <: State: ClassTag](
     merger: Merger[S],
-    routeFactory: RouteFactory,
+    outcomeFactory: OutcomeFactory,
     fallback: => Future[Result]
   )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
     for {
@@ -340,7 +340,7 @@ trait JourneyController[RequestContext] {
       result <- sbopt match {
                   case Some((state, breadcrumbs))
                       if is[S](state) || hasRecentState[S](breadcrumbs) =>
-                    rollbackAndModify[S](merger.withState(state))(fallback, routeFactory)(
+                    rollbackAndModify[S](merger.withState(state))(fallback, outcomeFactory)(
                       sbopt
                     )
                   case _ =>
@@ -361,7 +361,7 @@ trait JourneyController[RequestContext] {
     */
   protected final def showStateUsingMergerOrApply[S <: State: ClassTag](
     merger: Merger[S],
-    routeFactory: RouteFactory
+    outcomeFactory: OutcomeFactory
   )(
     transition: Transition
   )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
@@ -371,10 +371,10 @@ trait JourneyController[RequestContext] {
                   case Some((state, breadcrumbs))
                       if is[S](state) || hasRecentState[S](breadcrumbs) =>
                     rollbackAndModify[S](merger.withState(state))(
-                      apply(transition, routeFactory),
-                      routeFactory
+                      apply(transition, outcomeFactory),
+                      outcomeFactory
                     )(sb)
-                  case _ => apply(transition, routeFactory)
+                  case _ => apply(transition, outcomeFactory)
                 }
     } yield result
 
@@ -385,19 +385,19 @@ trait JourneyController[RequestContext] {
   protected final def waitFor[S <: State: ClassTag](
     interval: Long,
     maxTimestamp: Long
-  )(routeFactory: RouteFactory)(ifTimeout: Request[_] => Future[Result])(implicit
+  )(outcomeFactory: OutcomeFactory)(ifTimeout: Request[_] => Future[Result])(implicit
     rc: RequestContext,
     request: Request[_],
     ec: ExecutionContext
   ): Future[Result] =
     journeyService.currentState.flatMap {
       case Some(sb @ (state, _)) if is[S](state) =>
-        Future.successful(routeFactory(sb)(request))
+        Future.successful(outcomeFactory(sb)(request))
       case _ =>
         if (System.nanoTime() > maxTimestamp) ifTimeout(request)
         else
           Schedule(interval) {
-            waitFor[S](interval, maxTimestamp)(routeFactory)(ifTimeout)
+            waitFor[S](interval, maxTimestamp)(outcomeFactory)(ifTimeout)
           }
     }
 
@@ -438,7 +438,7 @@ trait JourneyController[RequestContext] {
   /** Rollback journey state and history (breadcrumbs) back to the most recent state of type S. */
   protected final def rollbackTo[S <: State: ClassTag](
     fallback: => Future[Result],
-    routeFactory: RouteFactory
+    outcomeFactory: OutcomeFactory
   )(
     stateAndBreadcrumbsOpt: Option[StateAndBreadcrumbs]
   )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
@@ -446,9 +446,9 @@ trait JourneyController[RequestContext] {
       case None => fallback
       case Some(sb @ (state, _)) =>
         if (is[S](state))
-          Future.successful(routeFactory(sb)(request))
+          Future.successful(outcomeFactory(sb)(request))
         else
-          journeyService.stepBack.flatMap(rollbackTo[S](fallback, routeFactory))
+          journeyService.stepBack.flatMap(rollbackTo[S](fallback, outcomeFactory))
     }
 
   /**
@@ -457,7 +457,7 @@ trait JourneyController[RequestContext] {
     */
   private final def rollbackAndModify[S <: State: ClassTag](modification: S => S)(
     fallback: => Future[Result],
-    routeFactory: RouteFactory
+    outcomeFactory: OutcomeFactory
   )(
     stateAndBreadcrumbsOpt: Option[StateAndBreadcrumbs]
   )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
@@ -467,10 +467,10 @@ trait JourneyController[RequestContext] {
         if (is[S](state))
           journeyService
             .modify(modification)
-            .map(routeFactory)
+            .map(outcomeFactory)
             .map(_(request))
         else
-          journeyService.stepBack.flatMap(rollbackAndModify(modification)(fallback, routeFactory))
+          journeyService.stepBack.flatMap(rollbackAndModify(modification)(fallback, outcomeFactory))
     }
 
   //-------------------------------------------------
@@ -498,7 +498,7 @@ trait JourneyController[RequestContext] {
   protected final def bindForm[T](
     form: Form[T],
     transition: T => Transition,
-    routeFactory: RouteFactory,
+    outcomeFactory: OutcomeFactory,
     fallback: => Future[Result]
   )(implicit
     rc: RequestContext,
@@ -523,15 +523,17 @@ trait JourneyController[RequestContext] {
             case None =>
               fallback
           },
-        userInput => apply(transition(userInput), routeFactory)
+        userInput => apply(transition(userInput), outcomeFactory)
       )
 
   /**
     * Parse request's body as JSON and apply transition if success,
     * otherwise return ifFailure result.
     */
-  protected final def parseJson[T: Reads](transition: T => Transition, routeFactory: RouteFactory)(
-    implicit
+  protected final def parseJson[T: Reads](
+    transition: T => Transition,
+    outcomeFactory: OutcomeFactory
+  )(implicit
     rc: RequestContext,
     request: Request[_],
     ec: ExecutionContext
@@ -539,7 +541,7 @@ trait JourneyController[RequestContext] {
     val body = request.asInstanceOf[Request[AnyContent]].body
     body.asJson.flatMap(_.asOpt[T]) match {
       case Some(entity) =>
-        apply(transition(entity), routeFactory)
+        apply(transition(entity), outcomeFactory)
       case None =>
         Future.failed(new IllegalArgumentException)
     }
@@ -555,10 +557,10 @@ trait JourneyController[RequestContext] {
   protected final def whenAuthorised[User](
     withAuthorised: WithAuthorised[User]
   )(transition: User => Transition)(
-    routeFactory: RouteFactory
+    outcomeFactory: OutcomeFactory
   )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
     withAuthorised(request) { user: User =>
-      apply(transition(user), routeFactory)
+      apply(transition(user), outcomeFactory)
     }
 
   /** Apply transition parametrized by an authorised user data and form output. */
@@ -615,17 +617,17 @@ trait JourneyController[RequestContext] {
 
   /** Customizable execution-time settings. */
   case class Settings(
-    routeFactoryOpt: Option[RouteFactory] = None
+    outcomeFactoryOpt: Option[OutcomeFactory] = None
   ) {
 
-    def setRouteFactory(routeFactory: RouteFactory): Settings =
-      copy(routeFactoryOpt = Some(routeFactory))
+    def setOutcomeFactory(outcomeFactory: OutcomeFactory): Settings =
+      copy(outcomeFactoryOpt = Some(outcomeFactory))
 
-    def setRouteFactory(routeFactoryOpt2: Option[RouteFactory]): Settings =
-      copy(routeFactoryOpt = routeFactoryOpt2)
+    def setOutcomeFactory(outcomeFactoryOpt2: Option[OutcomeFactory]): Settings =
+      copy(outcomeFactoryOpt = outcomeFactoryOpt2)
 
-    def routeFactoryWithDefault(routeFactory: RouteFactory): RouteFactory =
-      routeFactoryOpt.getOrElse(routeFactory)
+    def outcomeFactoryWithDefault(outcomeFactory: OutcomeFactory): OutcomeFactory =
+      outcomeFactoryOpt.getOrElse(outcomeFactory)
   }
 
   object Settings {
@@ -655,7 +657,7 @@ trait JourneyController[RequestContext] {
 
     /**
       * Execute and return the future of result.
-      * @param routeFactoryOpt optional override of the routeFactory
+      * @param outcomeFactoryOpt optional override of the outcomeFactory
       */
     def execute(
       settings: Settings
@@ -671,7 +673,7 @@ trait JourneyController[RequestContext] {
         def execute(
           settings: Settings
         )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
-          outer.execute(settings.setRouteFactory(JourneyController.this.display))
+          outer.execute(settings.setOutcomeFactory(JourneyController.this.display))
       }
     }
 
@@ -685,7 +687,9 @@ trait JourneyController[RequestContext] {
         def execute(
           settings: Settings
         )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
-          outer.execute(settings.setRouteFactory(JourneyController.this.displayUsing(renderState)))
+          outer.execute(
+            settings.setOutcomeFactory(JourneyController.this.displayUsing(renderState))
+          )
       }
     }
 
@@ -699,7 +703,7 @@ trait JourneyController[RequestContext] {
         def execute(
           settings: Settings
         )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
-          outer.execute(settings.setRouteFactory(JourneyController.this.redirect))
+          outer.execute(settings.setOutcomeFactory(JourneyController.this.redirect))
       }
     }
 
@@ -717,7 +721,7 @@ trait JourneyController[RequestContext] {
           implicit val rc: RequestContext = context(request)
           journeyService.currentState.flatMap { current =>
             outer.execute(
-              settings.setRouteFactory(current.map {
+              settings.setOutcomeFactory(current.map {
                 case sb @ (state, breadcrumbs) =>
                   JourneyController.this.redirectOrDisplayIfSame(state)
               })
@@ -741,7 +745,7 @@ trait JourneyController[RequestContext] {
           implicit val rc: RequestContext = context(request)
           journeyService.currentState.flatMap { current =>
             outer.execute(
-              settings.setRouteFactory(current.map {
+              settings.setOutcomeFactory(current.map {
                 case sb @ (state, breadcrumbs) =>
                   JourneyController.this.redirectOrDisplayUsingIfSame(state, renderState)
               })
@@ -757,13 +761,13 @@ trait JourneyController[RequestContext] {
       * otherwise redirect using URL returned by [[getCallFor]].
       */
     final def redirectOrDisplayIf[S <: State: ClassTag]: Executable = {
-      val outer                      = this
-      val routeFactory: RouteFactory = JourneyController.this.redirectOrDisplayIf[S]
+      val outer                          = this
+      val outcomeFactory: OutcomeFactory = JourneyController.this.redirectOrDisplayIf[S]
       new Executable {
         def execute(
           settings: Settings
         )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
-          outer.execute(settings.setRouteFactory(routeFactory))
+          outer.execute(settings.setOutcomeFactory(outcomeFactory))
       }
     }
 
@@ -774,13 +778,13 @@ trait JourneyController[RequestContext] {
       */
     final def redirectOrDisplayUsingIf[S <: State: ClassTag](renderState: Renderer): Executable = {
       val outer = this
-      val routeFactory: RouteFactory =
+      val outcomeFactory: OutcomeFactory =
         JourneyController.this.redirectOrDisplayUsingIf[S](renderState)
       new Executable {
         def execute(
           settings: Settings
         )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
-          outer.execute(settings.setRouteFactory(routeFactory))
+          outer.execute(settings.setOutcomeFactory(outcomeFactory))
       }
     }
 
@@ -790,13 +794,13 @@ trait JourneyController[RequestContext] {
       * otherwise display using [[renderState]],.
       */
     final def displayOrRedirectIf[S <: State: ClassTag]: Executable = {
-      val outer                      = this
-      val routeFactory: RouteFactory = JourneyController.this.displayOrRedirectIf[S]
+      val outer                          = this
+      val outcomeFactory: OutcomeFactory = JourneyController.this.displayOrRedirectIf[S]
       new Executable {
         def execute(
           settings: Settings
         )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
-          outer.execute(settings.setRouteFactory(routeFactory))
+          outer.execute(settings.setOutcomeFactory(outcomeFactory))
       }
     }
 
@@ -807,13 +811,13 @@ trait JourneyController[RequestContext] {
       */
     final def displayUsingOrRedirectIf[S <: State: ClassTag](renderState: Renderer): Executable = {
       val outer = this
-      val routeFactory: RouteFactory =
+      val outcomeFactory: OutcomeFactory =
         JourneyController.this.displayUsingOrRedirectIf[S](renderState)
       new Executable {
         def execute(
           settings: Settings
         )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
-          outer.execute(settings.setRouteFactory(routeFactory))
+          outer.execute(settings.setOutcomeFactory(outcomeFactory))
       }
     }
 
@@ -891,7 +895,7 @@ trait JourneyController[RequestContext] {
         JourneyController.this.journeyService.currentState.flatMap {
           case Some(sb @ (state, breadcrumbs)) =>
             Future.successful(
-              settings.routeFactoryWithDefault(JourneyController.this.display)(sb)(request)
+              settings.outcomeFactoryWithDefault(JourneyController.this.display)(sb)(request)
             )
           case None =>
             JourneyController.this.redirectToStart
@@ -918,21 +922,21 @@ trait JourneyController[RequestContext] {
       merger: Option[Merger[S]]
     ) extends Executable {
 
-      val defaultRouteFactory: RouteFactory =
+      val defaultOutcomeFactory: OutcomeFactory =
         JourneyController.this.redirectOrDisplayIf[S]
 
       override def execute(
         settings: Settings
       )(implicit request: Request[_], ec: ExecutionContext): Future[Result] = {
         implicit val rc: RequestContext = context(request)
-        val routeFactory                = settings.routeFactoryWithDefault(defaultRouteFactory)
+        val outcomeFactory              = settings.outcomeFactoryWithDefault(defaultOutcomeFactory)
         merger match {
           case None =>
-            JourneyController.this.showState[S](routeFactory, rollback, redirectToStart)
+            JourneyController.this.showState[S](outcomeFactory, rollback, redirectToStart)
 
           case Some(m) =>
             JourneyController.this
-              .showStateWithRollbackUsingMerger[S](m, routeFactory, redirectToStart)
+              .showStateWithRollbackUsingMerger[S](m, outcomeFactory, redirectToStart)
         }
       }
 
@@ -978,13 +982,13 @@ trait JourneyController[RequestContext] {
           settings: Settings
         )(implicit request: Request[_], ec: ExecutionContext): Future[Result] = {
           implicit val rc: RequestContext = JourneyController.this.context(request)
-          val routeFactory                = settings.routeFactoryWithDefault(defaultRouteFactory)
+          val outcomeFactory              = settings.outcomeFactoryWithDefault(defaultOutcomeFactory)
           merger match {
             case None =>
-              JourneyController.this.showStateOrApply[S](transition, routeFactory, rollback)
+              JourneyController.this.showStateOrApply[S](transition, outcomeFactory, rollback)
 
             case Some(m) =>
-              JourneyController.this.showStateUsingMergerOrApply[S](m, routeFactory)(transition)
+              JourneyController.this.showStateUsingMergerOrApply[S](m, outcomeFactory)(transition)
           }
         }
       }
@@ -1008,14 +1012,14 @@ trait JourneyController[RequestContext] {
           settings: Settings
         )(implicit request: Request[_], ec: ExecutionContext): Future[Result] = {
           implicit val rc: RequestContext = JourneyController.this.context(request)
-          val routeFactory                = settings.routeFactoryWithDefault(defaultRouteFactory)
+          val outcomeFactory              = settings.outcomeFactoryWithDefault(defaultOutcomeFactory)
           merger match {
             case None =>
               JourneyController.this
-                .showStateOrApply[S](transition(request), routeFactory, rollback)
+                .showStateOrApply[S](transition(request), outcomeFactory, rollback)
 
             case Some(m) =>
-              JourneyController.this.showStateUsingMergerOrApply[S](m, routeFactory)(
+              JourneyController.this.showStateUsingMergerOrApply[S](m, outcomeFactory)(
                 transition(request)
               )
           }
@@ -1036,7 +1040,7 @@ trait JourneyController[RequestContext] {
       )(implicit request: Request[_], ec: ExecutionContext): Future[Result] = {
         implicit val rc: RequestContext = JourneyController.this.context(request)
         JourneyController.this
-          .apply(transition, settings.routeFactoryOpt.getOrElse(JourneyController.this.redirect))
+          .apply(transition, settings.outcomeFactoryOpt.getOrElse(JourneyController.this.redirect))
       }
     }
 
@@ -1053,7 +1057,7 @@ trait JourneyController[RequestContext] {
         JourneyController.this
           .apply(
             transition(request),
-            settings.routeFactoryOpt.getOrElse(JourneyController.this.redirect)
+            settings.outcomeFactoryOpt.getOrElse(JourneyController.this.redirect)
           )
       }
     }
@@ -1083,7 +1087,7 @@ trait JourneyController[RequestContext] {
           JourneyController.this.bindForm(
             form,
             transition,
-            settings.routeFactoryWithDefault(JourneyController.this.redirect),
+            settings.outcomeFactoryWithDefault(JourneyController.this.redirect),
             redirectToStart
           )
         }
@@ -1106,7 +1110,7 @@ trait JourneyController[RequestContext] {
           JourneyController.this.bindForm(
             form,
             transition(request),
-            settings.routeFactoryWithDefault(JourneyController.this.redirect),
+            settings.outcomeFactoryWithDefault(JourneyController.this.redirect),
             redirectToStart
           )
         }
@@ -1136,7 +1140,7 @@ trait JourneyController[RequestContext] {
           implicit val rc: RequestContext = JourneyController.this.context(request)
           JourneyController.this.parseJson(
             transition,
-            settings.routeFactoryWithDefault(JourneyController.this.redirect)
+            settings.outcomeFactoryWithDefault(JourneyController.this.redirect)
           )
         }
       }
@@ -1156,7 +1160,7 @@ trait JourneyController[RequestContext] {
           implicit val rc: RequestContext = JourneyController.this.context(request)
           JourneyController.this.parseJson(
             transition(request),
-            settings.routeFactoryWithDefault(JourneyController.this.redirect)
+            settings.outcomeFactoryWithDefault(JourneyController.this.redirect)
           )
         }
       }
@@ -1187,23 +1191,23 @@ trait JourneyController[RequestContext] {
       new WaitFor[S](timeoutInSeconds)(redirect)
 
     final class WaitFor[S <: State: ClassTag] private[actions] (timeoutInSeconds: Int)(
-      routeFactory: RouteFactory
+      outcomeFactory: OutcomeFactory
     ) extends Executable {
       override def execute(
         settings: Settings
       )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
         waitForUsing(
           _ => Future.failed(new TimeoutException),
-          routeFactory
+          outcomeFactory
         )
 
       private def waitForUsing(
         ifTimeout: Request[_] => Future[Result],
-        routeFactory: RouteFactory
+        outcomeFactory: OutcomeFactory
       )(implicit request: Request[_], ec: ExecutionContext): Future[Result] = {
         implicit val rc: RequestContext = JourneyController.this.context(request)
         val maxTimestamp: Long          = System.nanoTime() + timeoutInSeconds * 1000000000L
-        JourneyController.this.waitFor[S](500, maxTimestamp)(routeFactory)(ifTimeout)
+        JourneyController.this.waitFor[S](500, maxTimestamp)(outcomeFactory)(ifTimeout)
       }
 
       /**
@@ -1228,10 +1232,10 @@ trait JourneyController[RequestContext] {
               implicit val rc: RequestContext = JourneyController.this.context(request)
               JourneyController.this.apply(
                 transition(request),
-                settings.routeFactoryOpt.getOrElse(JourneyController.this.redirect)
+                settings.outcomeFactoryOpt.getOrElse(JourneyController.this.redirect)
               )
             },
-            routeFactory
+            outcomeFactory
           )
       }
     }
@@ -1263,7 +1267,7 @@ trait JourneyController[RequestContext] {
             JourneyController.this.journeyService.currentState.flatMap {
               case Some(sb @ (state, breadcrumbs)) =>
                 Future.successful(
-                  settings.routeFactoryOpt.getOrElse(JourneyController.this.display)(sb)(request)
+                  settings.outcomeFactoryOpt.getOrElse(JourneyController.this.display)(sb)(request)
                 )
               case None =>
                 JourneyController.this.redirectToStart
@@ -1286,7 +1290,7 @@ trait JourneyController[RequestContext] {
         merger: Option[Merger[S]]
       ) extends Executable {
 
-        val defaultRouteFactory: RouteFactory =
+        val defaultOutcomeFactory: OutcomeFactory =
           JourneyController.this.redirectOrDisplayIf[S]
 
         override def execute(
@@ -1294,14 +1298,14 @@ trait JourneyController[RequestContext] {
         )(implicit request: Request[_], ec: ExecutionContext): Future[Result] = {
           implicit val rc: RequestContext = JourneyController.this.context(request)
           withAuthorised(request) { _ =>
-            val routeFactory = settings.routeFactoryWithDefault(defaultRouteFactory)
+            val outcomeFactory = settings.outcomeFactoryWithDefault(defaultOutcomeFactory)
             merger match {
               case None =>
-                JourneyController.this.showState[S](routeFactory, rollback, redirectToStart)
+                JourneyController.this.showState[S](outcomeFactory, rollback, redirectToStart)
 
               case Some(m) =>
                 JourneyController.this
-                  .showStateWithRollbackUsingMerger[S](m, routeFactory, redirectToStart)
+                  .showStateWithRollbackUsingMerger[S](m, outcomeFactory, redirectToStart)
             }
 
           }
@@ -1353,14 +1357,14 @@ trait JourneyController[RequestContext] {
           ): Future[Result] = {
             implicit val rc: RequestContext = JourneyController.this.context(request)
             withAuthorised(request) { user: User =>
-              val routeFactory = settings.routeFactoryWithDefault(defaultRouteFactory)
+              val outcomeFactory = settings.outcomeFactoryWithDefault(defaultOutcomeFactory)
               merger match {
                 case None =>
                   JourneyController.this
-                    .showStateOrApply[S](transition(user), routeFactory, rollback)
+                    .showStateOrApply[S](transition(user), outcomeFactory, rollback)
 
                 case Some(m) =>
-                  JourneyController.this.showStateUsingMergerOrApply[S](m, routeFactory)(
+                  JourneyController.this.showStateUsingMergerOrApply[S](m, outcomeFactory)(
                     transition(user)
                   )
               }
@@ -1394,14 +1398,14 @@ trait JourneyController[RequestContext] {
           ): Future[Result] = {
             implicit val rc: RequestContext = JourneyController.this.context(request)
             withAuthorised(request) { user: User =>
-              val routeFactory = settings.routeFactoryWithDefault(defaultRouteFactory)
+              val outcomeFactory = settings.outcomeFactoryWithDefault(defaultOutcomeFactory)
               merger match {
                 case None =>
                   JourneyController.this
-                    .showStateOrApply[S](transition(request)(user), routeFactory, rollback)
+                    .showStateOrApply[S](transition(request)(user), outcomeFactory, rollback)
 
                 case Some(m) =>
-                  JourneyController.this.showStateUsingMergerOrApply[S](m, routeFactory)(
+                  JourneyController.this.showStateUsingMergerOrApply[S](m, outcomeFactory)(
                     transition(request)(user)
                   )
               }
@@ -1427,7 +1431,7 @@ trait JourneyController[RequestContext] {
             JourneyController.this
               .apply(
                 transition(user),
-                settings.routeFactoryOpt.getOrElse(JourneyController.this.redirect)
+                settings.outcomeFactoryOpt.getOrElse(JourneyController.this.redirect)
               )
           }
       }
@@ -1448,7 +1452,7 @@ trait JourneyController[RequestContext] {
             implicit val rc: RequestContext = JourneyController.this.context(request)
             JourneyController.this.apply(
               transition(request)(user),
-              settings.routeFactoryOpt.getOrElse(JourneyController.this.redirect)
+              settings.outcomeFactoryOpt.getOrElse(JourneyController.this.redirect)
             )
           }
       }
@@ -1481,7 +1485,7 @@ trait JourneyController[RequestContext] {
               JourneyController.this.bindForm(
                 form,
                 transition(user),
-                settings.routeFactoryWithDefault(JourneyController.this.redirect),
+                settings.outcomeFactoryWithDefault(JourneyController.this.redirect),
                 redirectToStart
               )
             }
@@ -1507,7 +1511,7 @@ trait JourneyController[RequestContext] {
               JourneyController.this.bindForm(
                 form,
                 transition(request)(user),
-                settings.routeFactoryWithDefault(JourneyController.this.redirect),
+                settings.outcomeFactoryWithDefault(JourneyController.this.redirect),
                 redirectToStart
               )
             }
@@ -1545,7 +1549,7 @@ trait JourneyController[RequestContext] {
               implicit val rc: RequestContext = JourneyController.this.context(request)
               JourneyController.this.parseJson(
                 transition(user),
-                settings.routeFactoryWithDefault(JourneyController.this.redirect)
+                settings.outcomeFactoryWithDefault(JourneyController.this.redirect)
               )
             }
         }
@@ -1572,7 +1576,7 @@ trait JourneyController[RequestContext] {
               implicit val rc: RequestContext = JourneyController.this.context(request)
               JourneyController.this.parseJson(
                 transition(request)(user),
-                settings.routeFactoryWithDefault(JourneyController.this.redirect)
+                settings.outcomeFactoryWithDefault(JourneyController.this.redirect)
               )
             }
         }
@@ -1603,24 +1607,24 @@ trait JourneyController[RequestContext] {
         new WaitFor[S](timeoutInSeconds)(redirect)
 
       final class WaitFor[S <: State: ClassTag] private[actions] (timeoutInSeconds: Int)(
-        routeFactory: RouteFactory
+        outcomeFactory: OutcomeFactory
       ) extends Executable {
         override def execute(
           settings: Settings
         )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
           waitForUsing(
             _ => _ => Future.failed(new TimeoutException),
-            routeFactory
+            outcomeFactory
           )
 
         private def waitForUsing(
           ifTimeout: User => Request[_] => Future[Result],
-          routeFactory: RouteFactory
+          outcomeFactory: OutcomeFactory
         )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
           withAuthorised(request) { user: User =>
             implicit val rc: RequestContext = JourneyController.this.context(request)
             val maxTimestamp: Long          = System.nanoTime() + timeoutInSeconds * 1000000000L
-            JourneyController.this.waitFor[S](500, maxTimestamp)(routeFactory)(ifTimeout(user))
+            JourneyController.this.waitFor[S](500, maxTimestamp)(outcomeFactory)(ifTimeout(user))
           }
 
         /**
@@ -1644,10 +1648,10 @@ trait JourneyController[RequestContext] {
               implicit val rc: RequestContext = JourneyController.this.context(request)
               JourneyController.this.apply(
                 transition(request)(user),
-                settings.routeFactoryOpt.getOrElse(JourneyController.this.redirect)
+                settings.outcomeFactoryOpt.getOrElse(JourneyController.this.redirect)
               )
             }
-            waitForUsing(f, routeFactory)
+            waitForUsing(f, outcomeFactory)
           }
         }
       }
