@@ -38,7 +38,7 @@ lazy val library = Project(libName, file("."))
       ),
       play26 = Seq(
         "com.typesafe.play"      %% "play-json"          % "2.6.14",
-        "org.scalatestplus.play" %% "scalatestplus-play" % "3.1.2" % Test
+        "org.scalatestplus.play" %% "scalatestplus-play" % "3.1.3" % Test
       ),
       play27 = Seq(
         "com.typesafe.play"      %% "play-json"          % "2.7.4",
@@ -48,7 +48,7 @@ lazy val library = Project(libName, file("."))
     crossScalaVersions := List("2.11.12", "2.12.12"),
     resolvers := Seq(
       Resolver.bintrayRepo("hmrc", "releases"),
-      "typesafe-releases" at "http://repo.typesafe.com/typesafe/releases/"
+      "typesafe-releases" at "https://repo.typesafe.com/typesafe/releases/"
     ),
     dependencyOverrides += "com.typesafe.play" %% "twirl-api" % "1.4.2",
     playCrossCompilationSettings,
