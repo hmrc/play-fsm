@@ -71,6 +71,7 @@ trait JourneyController[RequestContext] {
   type Outcome        = Request[_] => Result
   type OutcomeFactory = StateAndBreadcrumbs => Outcome
   type Renderer       = Request[_] => (State, Breadcrumbs, Option[Form[_]]) => Result
+  type Fallback       = (RequestContext, Request[_], ExecutionContext) => Future[Result]
 
   protected final def is[S <: State: ClassTag](state: State): Boolean =
     implicitly[ClassTag[S]].runtimeClass.isAssignableFrom(state.getClass)
@@ -213,6 +214,8 @@ trait JourneyController[RequestContext] {
           .map(_ => result)
       )
 
+  final val redirectToStartFallback: Fallback = redirectToStart(_, _, _)
+
   /** Sync view, redirect back to the current state. */
   protected final def redirectToCurrentState(implicit
     rc: RequestContext,
@@ -227,6 +230,11 @@ trait JourneyController[RequestContext] {
         case None =>
           apply(journeyService.model.start, redirect)
       }
+
+  final val redirectToCurrentStateFallback: Fallback = redirectToCurrentState(_, _, _)
+
+  /** Override to change the default behaviour of the [[actions.show[State]]]. */
+  val defaultShowFallback: Fallback = redirectToStartFallback
 
   //-------------------------------------------------
   // STATE RENDERING HELPERS
@@ -270,7 +278,7 @@ trait JourneyController[RequestContext] {
   protected final def showState[S <: State: ClassTag](
     outcomeFactory: OutcomeFactory,
     rollback: Boolean = true,
-    fallback: => Future[Result]
+    fallback: Fallback
   )(implicit
     rc: RequestContext,
     request: Request[_],
@@ -286,7 +294,7 @@ trait JourneyController[RequestContext] {
                     rollbackTo[S](fallback, outcomeFactory)(sbopt)
 
                   case _ =>
-                    fallback
+                    fallback(rc, request, ec)
                 }
     } yield result
 
@@ -316,7 +324,7 @@ trait JourneyController[RequestContext] {
                     Future.successful(outcomeFactory(sb)(request))
 
                   case Some((state, breadcrumbs)) if `rollback` && hasRecentState[S](breadcrumbs) =>
-                    rollbackTo[S](apply(transition, outcomeFactory), outcomeFactory)(sbopt)
+                    rollbackTo[S](apply(transition, outcomeFactory)(_, _, _), outcomeFactory)(sbopt)
 
                   case _ =>
                     apply(transition, outcomeFactory)
@@ -333,7 +341,7 @@ trait JourneyController[RequestContext] {
   protected final def showStateWithRollbackUsingMerger[S <: State: ClassTag](
     merger: Merger[S],
     outcomeFactory: OutcomeFactory,
-    fallback: => Future[Result]
+    fallback: Fallback
   )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
     for {
       sbopt <- journeyService.currentState
@@ -344,7 +352,7 @@ trait JourneyController[RequestContext] {
                       sbopt
                     )
                   case _ =>
-                    fallback
+                    fallback(rc, request, ec)
                 }
     } yield result
 
@@ -371,7 +379,7 @@ trait JourneyController[RequestContext] {
                   case Some((state, breadcrumbs))
                       if is[S](state) || hasRecentState[S](breadcrumbs) =>
                     rollbackAndModify[S](merger.withState(state))(
-                      apply(transition, outcomeFactory),
+                      apply(transition, outcomeFactory)(_, _, _),
                       outcomeFactory
                     )(sb)
                   case _ => apply(transition, outcomeFactory)
@@ -437,13 +445,13 @@ trait JourneyController[RequestContext] {
 
   /** Rollback journey state and history (breadcrumbs) back to the most recent state of type S. */
   protected final def rollbackTo[S <: State: ClassTag](
-    fallback: => Future[Result],
+    fallback: Fallback,
     outcomeFactory: OutcomeFactory
   )(
     stateAndBreadcrumbsOpt: Option[StateAndBreadcrumbs]
   )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
     stateAndBreadcrumbsOpt match {
-      case None => fallback
+      case None => fallback(rc, request, ec)
       case Some(sb @ (state, _)) =>
         if (is[S](state))
           Future.successful(outcomeFactory(sb)(request))
@@ -456,13 +464,13 @@ trait JourneyController[RequestContext] {
     * and if exists, apply modification.
     */
   private final def rollbackAndModify[S <: State: ClassTag](modification: S => S)(
-    fallback: => Future[Result],
+    fallback: Fallback,
     outcomeFactory: OutcomeFactory
   )(
     stateAndBreadcrumbsOpt: Option[StateAndBreadcrumbs]
   )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
     stateAndBreadcrumbsOpt match {
-      case None => fallback
+      case None => fallback(rc, request, ec)
       case Some((state, _)) =>
         if (is[S](state))
           journeyService
@@ -907,19 +915,29 @@ trait JourneyController[RequestContext] {
       * Display if the current state is of type S,
       * otherwise redirect back to the root state.
       *
-      * @note to alter behaviour follow with [[orRollback]], [[orRollbackUsing]], [[orApply]] or [[orApplyWithRequest]]
+      * @tparam S type of the expected current state
       *
-      * @tparam S type of the state to display
+      * @note to alter show behaviour follow with:
+      * - [[orRollback]],
+      * - [[orRollbackUsing]],
+      * - [[orApply]],
+      * - [[orApplyWithRequest]]
+      * - [[orRedirectToCurrentState]]
+      * - [[orRedirectToStart]]
+      * - [[orReturn]]
+      * - [[orRedirectTo]]
       */
     def show[S <: State: ClassTag]: Show[S] =
       new Show[S](
         rollback = false,
-        merger = None
+        merger = None,
+        fallback = JourneyController.this.defaultShowFallback
       )
 
     final class Show[S <: State: ClassTag] private[actions] (
       rollback: Boolean,
-      merger: Option[Merger[S]]
+      merger: Option[Merger[S]],
+      fallback: Fallback
     ) extends Executable {
 
       val defaultOutcomeFactory: OutcomeFactory =
@@ -932,11 +950,12 @@ trait JourneyController[RequestContext] {
         val outcomeFactory              = settings.outcomeFactoryWithDefault(defaultOutcomeFactory)
         merger match {
           case None =>
-            JourneyController.this.showState[S](outcomeFactory, rollback, redirectToStart)
+            JourneyController.this
+              .showState[S](outcomeFactory, rollback, fallback)
 
           case Some(m) =>
             JourneyController.this
-              .showStateWithRollbackUsingMerger[S](m, outcomeFactory, redirectToStart)
+              .showStateWithRollbackUsingMerger[S](m, outcomeFactory, fallback)
         }
       }
 
@@ -948,7 +967,7 @@ trait JourneyController[RequestContext] {
         *
         * @note to alter behaviour follow with [[orApply]] or [[orApplyWithRequest]]
         */
-      def orRollback: Show[S] = new Show[S](rollback = true, merger = None)
+      def orRollback: Show[S] = new Show[S](rollback = true, merger = None, fallback = fallback)
 
       /**
         * Modify [[show]] behaviour:
@@ -963,7 +982,7 @@ trait JourneyController[RequestContext] {
         * @note to alter behaviour follow with [[orApply]] or [[orApplyWithRequest]]
         */
       def orRollbackUsing(merger: Merger[S]): Show[S] =
-        new Show[S](rollback = true, merger = Some(merger))
+        new Show[S](rollback = true, merger = Some(merger), fallback = fallback)
 
       /**
         * Modify [[show]] behaviour:
@@ -1025,6 +1044,54 @@ trait JourneyController[RequestContext] {
           }
         }
       }
+
+      /**
+        * Modify [[show]] behaviour:
+        * Redirect to the current state if not S,
+        * instead of using the default show fallback.
+        */
+      def orRedirectToCurrentState: Show[S] =
+        new Show[S](
+          rollback = rollback,
+          merger = merger,
+          fallback = JourneyController.this.redirectToCurrentStateFallback
+        )
+
+      /**
+        * Modify [[show]] behaviour:
+        * Redirect to the Start state if current state is not of S type,
+        * instead of using the default show fallback.
+        */
+      def orRedirectToStart: Show[S] =
+        new Show[S](
+          rollback = rollback,
+          merger = merger,
+          fallback = JourneyController.this.redirectToStartFallback
+        )
+
+      /**
+        * Modify [[show]] behaviour:
+        * Return the given result if current state is not of S type,
+        * instead of using the default show fallback.
+        */
+      def orReturn(result: => Result): Show[S] =
+        new Show[S](
+          rollback = rollback,
+          merger = merger,
+          fallback = (_, _, _) => Future.successful(result)
+        )
+
+      /**
+        * Modify [[show]] behaviour:
+        * Redirect to the given call if current state is not of S type,
+        * instead of using the default show fallback.
+        */
+      def orRedirectTo(call: Call): Show[S] =
+        new Show[S](
+          rollback = rollback,
+          merger = merger,
+          fallback = (_, _, _) => Future.successful(Results.Redirect(call))
+        )
     }
 
     /**
@@ -1277,17 +1344,32 @@ trait JourneyController[RequestContext] {
 
       /**
         * Display if the current state is of type S,
-        * otherwise redirect back to the root state.
+        * otherwise use the default show fallback,
+        * e.g. redirect back to the root state.
         *
-        * @note to alter behaviour follow with [[orRollback]], [[orRollbackUsing]], [[orApply]] or [[orApplyWithRequest]]
+        * @tparam S type of the expected current state
         *
-        * @tparam S type of the state to display
+        * @note to alter show behaviour follow with:
+        * - [[orRollback]],
+        * - [[orRollbackUsing]],
+        * - [[orApply]],
+        * - [[orApplyWithRequest]]
+        * - [[orRedirectToCurrentState]]
+        * - [[orRedirectToStart]]
+        * - [[orReturn]]
+        * - [[orRedirectTo]]
         */
-      def show[S <: State: ClassTag]: Show[S] = new Show[S](rollback = false, merger = None)
+      def show[S <: State: ClassTag]: Show[S] =
+        new Show[S](
+          rollback = false,
+          merger = None,
+          fallback = JourneyController.this.defaultShowFallback
+        )
 
       final class Show[S <: State: ClassTag] private[actions] (
         rollback: Boolean,
-        merger: Option[Merger[S]]
+        merger: Option[Merger[S]],
+        fallback: Fallback
       ) extends Executable {
 
         val defaultOutcomeFactory: OutcomeFactory =
@@ -1301,11 +1383,12 @@ trait JourneyController[RequestContext] {
             val outcomeFactory = settings.outcomeFactoryWithDefault(defaultOutcomeFactory)
             merger match {
               case None =>
-                JourneyController.this.showState[S](outcomeFactory, rollback, redirectToStart)
+                JourneyController.this
+                  .showState[S](outcomeFactory, rollback, fallback)
 
               case Some(m) =>
                 JourneyController.this
-                  .showStateWithRollbackUsingMerger[S](m, outcomeFactory, redirectToStart)
+                  .showStateWithRollbackUsingMerger[S](m, outcomeFactory, fallback)
             }
 
           }
@@ -1319,7 +1402,7 @@ trait JourneyController[RequestContext] {
           *
           * @note to alter behaviour follow with [[orApply]] or [[orApplyWithRequest]]
           */
-        def orRollback: Show[S] = new Show[S](rollback = true, merger = None)
+        def orRollback: Show[S] = new Show[S](rollback = true, merger = None, fallback = fallback)
 
         /**
           * Modify [[show]] behaviour:
@@ -1332,7 +1415,7 @@ trait JourneyController[RequestContext] {
           * or redirect back to the root state.
           */
         def orRollbackUsing(merger: Merger[S]): Show[S] =
-          new Show[S](rollback = true, merger = Some(merger))
+          new Show[S](rollback = true, merger = Some(merger), fallback = fallback)
 
         /**
           * Modify [[show]] behaviour:
@@ -1412,6 +1495,54 @@ trait JourneyController[RequestContext] {
             }
           }
         }
+
+        /**
+          * Modify [[show]] behaviour:
+          * Redirect to the current state if not S,
+          * instead of using the default show fallback.
+          */
+        def orRedirectToCurrentState: Show[S] =
+          new Show[S](
+            rollback = rollback,
+            merger = merger,
+            fallback = JourneyController.this.redirectToCurrentStateFallback
+          )
+
+        /**
+          * Reset [[show]] behaviour:
+          * Redirect to the Start state if current state is not of S type,
+          * instead of using the default show fallback.
+          */
+        def orRedirectToStart: Show[S] =
+          new Show[S](
+            rollback = rollback,
+            merger = merger,
+            fallback = JourneyController.this.redirectToStartFallback
+          )
+
+        /**
+          * Modify [[show]] behaviour:
+          * Return the given result if current state is not of S type,
+          * instead of using the default show fallback.
+          */
+        def orReturn(result: => Result): Show[S] =
+          new Show[S](
+            rollback = rollback,
+            merger = merger,
+            fallback = (_, _, _) => Future.successful(result)
+          )
+
+        /**
+          * Modify [[show]] behaviour:
+          * Redirect to the given call if current state is not of S type,
+          * instead of using the default show fallback.
+          */
+        def orRedirectTo(call: Call): Show[S] =
+          new Show[S](
+            rollback = rollback,
+            merger = merger,
+            fallback = (_, _, _) => Future.successful(Results.Redirect(call))
+          )
       }
 
       /**

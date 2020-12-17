@@ -42,44 +42,49 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
 
   // ACTIONS
 
-  val start: Action[AnyContent] = action { implicit request =>
+  val oldStart: Action[AnyContent] = action { implicit request =>
     journeyService
       .cleanBreadcrumbs(_ => Nil)
       .flatMap(_ => apply(journeyService.model.start, redirect))
   }
 
-  val showStart: Action[AnyContent] = actionShowState {
+  val oldShowStart: Action[AnyContent] = actionShowState {
     case State.Start =>
   }
 
-  val showStartDsl: Action[AnyContent] =
+  val showStartOrRollback: Action[AnyContent] =
     actions
       .show[State.Start.type]
       .orRollback
 
-  val showStartDsl2: Action[AnyContent] =
+  val showStartOrRollbackAndCleanBreadcrumbs: Action[AnyContent] =
     actions
       .show[State.Start.type]
       .orRollback
       .andCleanBreadcrumbs()
 
-  val showStartDsl3: Action[AnyContent] =
+  val showStartOrRollbackUsingMerger: Action[AnyContent] =
     actions
       .show[State.Start.type]
       .orRollbackUsing(Mergers.toStart)
 
-  val showStartDsl4: Action[AnyContent] =
+  val showStartOrRollbackUsingMergerViaRedirect: Action[AnyContent] =
     actions
       .show[State.Start.type]
       .orRollbackUsing(Mergers.toStart)
       .redirect
 
-  def continue: Action[AnyContent] =
+  val showStartOrRedirectToCurrentState: Action[AnyContent] =
+    actions
+      .show[State.Start.type]
+      .orRedirectToCurrentState
+
+  def oldContinue: Action[AnyContent] =
     action { implicit request =>
       whenAuthorisedWithForm(asUser)(ArgForm)(Transitions.continue)
     }
 
-  def continueDsl: Action[AnyContent] =
+  def whenAuthorisedBindFormAndApplyTransitionContinue: Action[AnyContent] =
     actions
       .whenAuthorised(asUser)
       .bindForm(ArgForm)
@@ -91,69 +96,94 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
       .bindForm(ArgForm)
       .applyWithRequest(_ => Transitions.continue)
 
-  val showContinue: Action[AnyContent] = actionShowStateWhenAuthorised(asUser) {
+  val oldShowContinue: Action[AnyContent] = actionShowStateWhenAuthorised(asUser) {
     case State.Continue(_) =>
   }
 
-  val showWithRollbackContinueDsl: Action[AnyContent] =
+  val whenAuthorisedShowContinueOrRollback: Action[AnyContent] =
     actions
       .whenAuthorised(asUser)
       .show[State.Continue]
       .orRollback
 
-  val showWithRollbackContinueDsl2: Action[AnyContent] =
+  val whenAuthorisedShowContinueOrRollbackUsing: Action[AnyContent] =
     actions
       .whenAuthorised(asUser)
       .show[State.Continue]
       .orRollbackUsing(Mergers.toContinue)
 
-  val showWithRollbackOrApplyContinueDsl: Action[AnyContent] =
+  val whenAuthorisedShowContinueOrRollbackOrApplyTransitionShowContinue: Action[AnyContent] =
     actions
       .whenAuthorised(asUser)
       .show[State.Continue]
       .orRollback
       .orApply(Transitions.showContinue)
 
-  val showOrApplyContinueDsl: Action[AnyContent] =
+  val whenAuthorisedShowContinueOrApplyShowContinue: Action[AnyContent] =
     actions
       .whenAuthorised(asUser)
       .show[State.Continue]
       .orApply(Transitions.showContinue)
 
-  val showWithRollbackOrApplyContinueDsl2: Action[AnyContent] =
+  val whenAuthorisedShowContinueOrRollbackOrApplyWithRequestTransitionShowContinue
+    : Action[AnyContent] =
     actions
       .whenAuthorised(asUser)
       .show[State.Continue]
       .orRollback
       .orApplyWithRequest(implicit request => Transitions.showContinue)
 
-  val showOrApplyContinueDsl2: Action[AnyContent] =
+  val whenAuthorisedShowContinueOrApplyWithRequestTransitionShowContinue: Action[AnyContent] =
     actions
       .whenAuthorised(asUser)
       .show[State.Continue]
       .orApplyWithRequest(implicit request => Transitions.showContinue)
 
-  val stop: Action[AnyContent] = action { implicit request =>
+  val whenAuthorisedShowContinueOrRedirectToCurrentState: Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .show[State.Continue]
+      .orRedirectToCurrentState
+
+  val whenAuthorisedShowContinueOrRedirectToStart: Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .show[State.Continue]
+      .orRedirectToStart
+
+  val whenAuthorisedShowContinueOrReturn: Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .show[State.Continue]
+      .orReturn(NotAcceptable)
+
+  val whenAuthorisedShowContinueOrRedirectTo: Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .show[State.Continue]
+      .orRedirectTo(Call("GET", "/dummy"))
+
+  val oldStop: Action[AnyContent] = action { implicit request =>
     whenAuthorised(asUser)(Transitions.stop)(redirect)
   }
 
-  val stopDsl: Action[AnyContent] =
+  val whenAuthorisedApplyTransitionStop: Action[AnyContent] =
     actions
       .whenAuthorised(asUser)
       .apply(Transitions.stop)
 
-  val stopDsl2: Action[AnyContent] =
+  val whenAuthorisedApplyWithRequestTransitionStop: Action[AnyContent] =
     actions
       .whenAuthorised(asUser)
       .applyWithRequest(_ => Transitions.stop)
 
-  val stopDsl3: Action[AnyContent] =
+  val whenAuthorisedApplyTransitionStopRedirectOrDisplayIfSame: Action[AnyContent] =
     actions
       .whenAuthorised(asUser)
       .apply(Transitions.stop)
       .redirectOrDisplayIfSame
 
-  val stopDsl4: Action[AnyContent] =
+  val applyTransitionStopRedirectOrDisplayIfSame: Action[AnyContent] =
     actions
       .apply(Transitions.stop(555))
       .redirectOrDisplayIfSame

@@ -54,152 +54,179 @@ class DummyJourneyControllerSpec
   def fakeRequest = FakeRequest()
 
   "DummyJourneyController" should {
-    "after POST /start transition to Start" in {
+    "given none when oldStart then redirect to Start" in {
       journeyState.clear
-      val result = controller.start(fakeRequest)
+      val result = controller.oldStart(fakeRequest)
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/start")
       journeyState.get           should have[State](State.Start, Nil)
     }
 
-    "after GET /start transition to Start when uninitialized" in {
+    "given none when oldShowStart then redirect to Start" in {
       journeyState.clear
-      val result = controller.showStart(fakeRequest)
+      val result = controller.oldShowStart(fakeRequest)
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/start")
       journeyState.get           should have[State](State.Start, Nil)
     }
 
-    "dsl: after GET /start transition to Start when uninitialized" in {
+    "given none when showStartOrRollback then redirect to Start" in {
       journeyState.clear
-      val result = controller.showStartDsl(fakeRequest)
+      val result = controller.showStartOrRollback(fakeRequest)
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/start")
       journeyState.get           should have[State](State.Start, Nil)
     }
 
-    "dsl+clean: after GET /start transition to Start when uninitialized" in {
+    "given none when showStartOrRollbackAndCleanBreadcrumbs then redirect to Start" in {
       journeyState.clear
-      val result = controller.showStartDsl2(fakeRequest)
+      val result = controller.showStartOrRollbackAndCleanBreadcrumbs(fakeRequest)
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/start")
       journeyState.get           should have[State](State.Start, Nil)
     }
 
-    "dsl+merge: after GET /start transition to Start when uninitialized" in {
+    "given none when showStartOrRollbackUsingMerger goto Start" in {
       journeyState.clear
-      val result = controller.showStartDsl3(fakeRequest)
+      val result = controller.showStartOrRollbackUsingMerger(fakeRequest)
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/start")
       journeyState.get           should have[State](State.Start, Nil)
     }
 
-    "dsl+merge+redirect: after GET /start transition to Start when uninitialized" in {
+    "given none when showStartOrRollbackUsingMergerViaRedirect then redirect to Start" in {
       journeyState.clear
-      val result = controller.showStartDsl4(fakeRequest)
+      val result = controller.showStartOrRollbackUsingMergerViaRedirect(fakeRequest)
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/start")
       journeyState.get           should have[State](State.Start, Nil)
     }
 
-    "after GET /start show Start when in Start" in {
+    "given none when showStartOrRedirectToCurrentState then redirect to Start" in {
+      journeyState.clear
+      val result = controller.showStartOrRedirectToCurrentState(fakeRequest)
+      status(result)           shouldBe 303
+      redirectLocation(result) shouldBe Some("/start")
+      journeyState.get           should have[State](State.Start, Nil)
+    }
+
+    "given Start when showStart then display Start" in {
       journeyState.set(State.Start, Nil)
-      val result = controller.showStart(fakeRequest)
+      val result = controller.oldShowStart(fakeRequest)
       status(result) shouldBe 200
       journeyState.get should have[State](State.Start, Nil)
     }
 
-    "dsl: after GET /start show Start when in Start" in {
+    "given Start when showStartOrRollback then display Start" in {
       journeyState.set(State.Start, Nil)
-      val result = controller.showStartDsl(fakeRequest)
+      val result = controller.showStartOrRollback(fakeRequest)
       status(result) shouldBe 200
       journeyState.get should have[State](State.Start, Nil)
     }
 
-    "dsl+clean: after GET /start show Start when in Start" in {
+    "given Start when showStartOrRollbackAndCleanBreadcrumbs then display Start" in {
       journeyState.set(State.Start, Nil)
-      val result = controller.showStartDsl2(fakeRequest)
+      val result = controller.showStartOrRollbackAndCleanBreadcrumbs(fakeRequest)
       status(result) shouldBe 200
       journeyState.get should have[State](State.Start, Nil)
     }
 
-    "dsl+merge: after GET /start show Start when in Start" in {
+    "given Start when showStartOrRollbackUsingMerger then display Start" in {
       journeyState.set(State.Start, Nil)
-      val result = controller.showStartDsl3(fakeRequest)
+      val result = controller.showStartOrRollbackUsingMerger(fakeRequest)
       status(result) shouldBe 200
       journeyState.get should have[State](State.Start, Nil)
     }
 
-    "dsl+merge+redirect: after GET /start show Start when in Start" in {
+    "given Start when showStartOrRollbackUsingMergerViaRedirect then redirect to Start" in {
       journeyState.set(State.Start, Nil)
-      val result = controller.showStartDsl4(fakeRequest)
+      val result = controller.showStartOrRollbackUsingMergerViaRedirect(fakeRequest)
       status(result) shouldBe 303
       journeyState.get should have[State](State.Start, Nil)
     }
 
-    "after GET /start show previous Start when in Continue" in {
-      journeyState.set(State.Continue("dummy"), List(State.Start))
-      val result = controller.showStart(fakeRequest)
-      status(result) shouldBe 200
-      journeyState.get should have[State](State.Start, Nil)
-    }
-
-    "dsl: after GET /start show previous Start when in Continue" in {
-      journeyState.set(State.Continue("dummy"), List(State.Start))
-      val result = controller.showStartDsl(fakeRequest)
-      status(result) shouldBe 200
-      journeyState.get should have[State](State.Start, Nil)
-    }
-
-    "dsl+clean: after GET /start show previous Start when in Continue" in {
-      journeyState.set(State.Continue("dummy"), List(State.Start))
-      val result = controller.showStartDsl2(fakeRequest)
-      status(result) shouldBe 200
-      journeyState.get should have[State](State.Start, Nil)
-    }
-
-    "dsl+merge: after GET /start show previous Start when in Continue" in {
-      journeyState.set(State.Continue("dummy"), List(State.Start))
-      val result = controller.showStartDsl3(fakeRequest)
-      status(result) shouldBe 200
-      journeyState.get should have[State](State.Start, Nil)
-    }
-
-    "after POST /continue transition to Continue when in Start" in {
+    "given Start when showStartOrRedirectToCurrentState then display Start" in {
       journeyState.set(State.Start, Nil)
-      val result = controller.continue(fakeRequest.withFormUrlEncodedBody("arg" -> "dummy"))
+      val result = controller.showStartOrRedirectToCurrentState(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](State.Start, Nil)
+    }
+
+    "given Continue when oldShowStart then display most recent Start" in {
+      journeyState.set(State.Continue("dummy"), List(State.Start))
+      val result = controller.oldShowStart(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](State.Start, Nil)
+    }
+
+    "given Continue when showStartOrRollback then display most recent Start" in {
+      journeyState.set(State.Continue("dummy"), List(State.Start))
+      val result = controller.showStartOrRollback(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](State.Start, Nil)
+    }
+
+    "given Continue when showStartOrRollbackAndCleanBreadcrumbs then display most recent Start" in {
+      journeyState.set(State.Continue("dummy"), List(State.Start))
+      val result = controller.showStartOrRollbackAndCleanBreadcrumbs(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](State.Start, Nil)
+    }
+
+    "given Continue when showStartOrRollbackUsingMerger then display most recent Start" in {
+      journeyState.set(State.Continue("dummy"), List(State.Start))
+      val result = controller.showStartOrRollbackUsingMerger(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](State.Start, Nil)
+    }
+
+    "given Continue when showStartOrRedirectToCurrentState then redirect to Continue" in {
+      journeyState.set(State.Continue("dummy"), List(State.Start))
+      val result = controller.showStartOrRedirectToCurrentState(fakeRequest)
+      status(result) shouldBe 303
+      journeyState.get should have[State](State.Continue("dummy"), List(State.Start))
+    }
+
+    "given Start when oldContinue then redirect to Continue" in {
+      journeyState.set(State.Start, Nil)
+      val result = controller.oldContinue(fakeRequest.withFormUrlEncodedBody("arg" -> "dummy"))
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/continue")
       journeyState.get           should have[State](State.Continue("dummy"), List(State.Start))
     }
 
-    "dsl: after POST /continue transition to Continue when in Start" in {
+    "given Start whenAuthorisedBindFormAndApplyTransitionContinue then redirect to Continue" in {
       journeyState.set(State.Start, Nil)
-      val result = controller.continueDsl(fakeRequest.withFormUrlEncodedBody("arg" -> "dummy"))
+      val result = controller.whenAuthorisedBindFormAndApplyTransitionContinue(
+        fakeRequest.withFormUrlEncodedBody("arg" -> "dummy")
+      )
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/continue")
       journeyState.get           should have[State](State.Continue("dummy"), List(State.Start))
     }
 
-    "after invalid POST /continue stay in Start when in Start" in {
+    "given Start when oldContinue then redirect to Start" in {
       journeyState.set(State.Start, Nil)
-      val result = controller.continue(fakeRequest.withFormUrlEncodedBody())
+      val result = controller.oldContinue(fakeRequest.withFormUrlEncodedBody())
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/start")
       journeyState.get           should have[State](State.Start, Nil)
     }
 
-    "dsl: after invalid POST /continue stay in Start when in Start" in {
+    "given Start when whenAuthorisedBindFormAndApplyTransitionContinue then redirect to Start" in {
       journeyState.set(State.Start, Nil)
-      val result = controller.continueDsl(fakeRequest.withFormUrlEncodedBody())
+      val result =
+        controller.whenAuthorisedBindFormAndApplyTransitionContinue(
+          fakeRequest.withFormUrlEncodedBody()
+        )
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/start")
       journeyState.get           should have[State](State.Start, Nil)
     }
 
-    "after POST /continue transition to Continue when in Continue" in {
+    "given Continue when oldContinue then redirect to Continue" in {
       journeyState.set(State.Continue("dummy"), List(State.Start))
-      val result = controller.continue(fakeRequest.withFormUrlEncodedBody("arg" -> "foo"))
+      val result = controller.oldContinue(fakeRequest.withFormUrlEncodedBody("arg" -> "foo"))
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/continue")
       journeyState.get should have[State](
@@ -208,9 +235,11 @@ class DummyJourneyControllerSpec
       )
     }
 
-    "dsl: after POST /continue transition to Continue when in Continue" in {
+    "given Continue whenAuthorisedBindFormAndApplyTransitionContinue then redirect to Continue " in {
       journeyState.set(State.Continue("dummy"), List(State.Start))
-      val result = controller.continueDsl(fakeRequest.withFormUrlEncodedBody("arg" -> "foo"))
+      val result = controller.whenAuthorisedBindFormAndApplyTransitionContinue(
+        fakeRequest.withFormUrlEncodedBody("arg" -> "foo")
+      )
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/continue")
       journeyState.get should have[State](
@@ -219,27 +248,29 @@ class DummyJourneyControllerSpec
       )
     }
 
-    "after invalid POST /continue stay in Continue when in Continue" in {
+    "given Continue when oldContinue then redirect to Continue with flashed params" in {
       journeyState.set(State.Continue("dummy"), List(State.Start))
-      val result = controller.continue(fakeRequest.withFormUrlEncodedBody("foo" -> "arg"))
+      val result = controller.oldContinue(fakeRequest.withFormUrlEncodedBody("foo" -> "arg"))
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/continue")
       flash(result)            shouldBe Flash(Map("foo" -> "arg"))
       journeyState.get           should have[State](State.Continue("dummy"), List(State.Start))
     }
 
-    "dsl: after invalid POST /continue stay in Continue when in Continue" in {
+    "given Continue whenAuthorisedBindFormAndApplyTransitionContinue then redirect to Continue with flashed params" in {
       journeyState.set(State.Continue("dummy"), List(State.Start))
-      val result = controller.continueDsl(fakeRequest.withFormUrlEncodedBody("foo" -> "arg"))
+      val result = controller.whenAuthorisedBindFormAndApplyTransitionContinue(
+        fakeRequest.withFormUrlEncodedBody("foo" -> "arg")
+      )
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/continue")
       flash(result)            shouldBe Flash(Map("foo" -> "arg"))
       journeyState.get           should have[State](State.Continue("dummy"), List(State.Start))
     }
 
-    "after POST /continue stay in Stop when in Stop" in {
+    "given Stop when oldContinue then redirect back to Stop" in {
       journeyState.set(State.Stop("dummy"), List(State.Continue("dummy"), State.Start))
-      val result = controller.continue(fakeRequest.withFormUrlEncodedBody("arg" -> "foo"))
+      val result = controller.oldContinue(fakeRequest.withFormUrlEncodedBody("arg" -> "foo"))
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/stop")
       journeyState.get should have[State](
@@ -248,9 +279,11 @@ class DummyJourneyControllerSpec
       )
     }
 
-    "dsl: after POST /continue stay in Stop when in Stop" in {
+    "given Stop whenAuthorisedBindFormAndApplyTransitionContinue then redirect back to Stop" in {
       journeyState.set(State.Stop("dummy"), List(State.Continue("dummy"), State.Start))
-      val result = controller.continueDsl(fakeRequest.withFormUrlEncodedBody("arg" -> "foo"))
+      val result = controller.whenAuthorisedBindFormAndApplyTransitionContinue(
+        fakeRequest.withFormUrlEncodedBody("arg" -> "foo")
+      )
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/stop")
       journeyState.get should have[State](
@@ -259,44 +292,45 @@ class DummyJourneyControllerSpec
       )
     }
 
-    "after GET /continue show Continue when in Continue" in {
+    "given Continue when oldShowContinue then display Continue" in {
       journeyState.set(State.Continue("dummy"), List(State.Start))
-      val result = controller.showContinue(fakeRequest)
+      val result = controller.oldShowContinue(fakeRequest)
       status(result) shouldBe 200
       journeyState.get should have[State](State.Continue("dummy"), List(State.Start))
     }
 
-    "dsl: after GET /continue show Continue when in Continue" in {
+    "given Continue whenAuthorisedShowContinueOrRollback then display Continue" in {
       journeyState.set(State.Continue("dummy"), List(State.Start))
-      val result = controller.showWithRollbackContinueDsl(fakeRequest)
+      val result = controller.whenAuthorisedShowContinueOrRollback(fakeRequest)
       status(result) shouldBe 200
       journeyState.get should have[State](State.Continue("dummy"), List(State.Start))
     }
 
-    "dsl+merge: after GET /continue show Continue when in Continue" in {
+    "given Continue whenAuthorisedShowContinueOrRollbackUsing then display Continue" in {
       journeyState.set(State.Continue("dummy"), List(State.Start))
-      val result = controller.showWithRollbackContinueDsl2(fakeRequest)
+      val result = controller.whenAuthorisedShowContinueOrRollbackUsing(fakeRequest)
       status(result) shouldBe 200
       journeyState.get should have[State](State.Continue("dummy"), List(State.Start))
     }
 
-    "after GET /continue show previous Continue when in Stop" in {
+    "given Stop when oldShowContinue then display Continue" in {
       journeyState.set(State.Stop("dummy"), List(State.Continue("dummy"), State.Start))
-      val result = controller.showContinue(fakeRequest)
+      val result = controller.oldShowContinue(fakeRequest)
       status(result) shouldBe 200
       journeyState.get should have[State](State.Continue("dummy"), List(State.Start))
     }
 
-    "dsl: after GET /continue show previous Continue when in Stop" in {
+    "given Stop whenAuthorisedShowContinueOrRollback then display Continue" in {
       journeyState.set(State.Stop("dummy"), List(State.Continue("dummy"), State.Start))
-      val result = controller.showWithRollbackContinueDsl(fakeRequest)
+      val result = controller.whenAuthorisedShowContinueOrRollback(fakeRequest)
       status(result) shouldBe 200
       journeyState.get should have[State](State.Continue("dummy"), List(State.Start))
     }
 
-    "show+rollback+apply: after GET /continue show new Continue when in Start" in {
+    "giben Start whenAuthorisedShowContinueOrRollbackOrApplyTransitionShowContinue then display Continue" in {
       journeyState.set(State.Start, Nil)
-      val result = controller.showWithRollbackOrApplyContinueDsl(fakeRequest)
+      val result =
+        controller.whenAuthorisedShowContinueOrRollbackOrApplyTransitionShowContinue(fakeRequest)
       status(result) shouldBe 200
       journeyState.get should have[State](
         State.Continue("yummy"),
@@ -304,9 +338,9 @@ class DummyJourneyControllerSpec
       )
     }
 
-    "show+apply: after GET /continue show new Continue when in Start" in {
+    "given Start whenAuthorisedShowContinueOrApplyShowContinue then display Continue" in {
       journeyState.set(State.Start, Nil)
-      val result = controller.showOrApplyContinueDsl(fakeRequest)
+      val result = controller.whenAuthorisedShowContinueOrApplyShowContinue(fakeRequest)
       status(result) shouldBe 200
       journeyState.get should have[State](
         State.Continue("yummy"),
@@ -314,9 +348,12 @@ class DummyJourneyControllerSpec
       )
     }
 
-    "show+rollback+apply2: after GET /continue show new Continue when in Start" in {
+    "given Start whenAuthorisedShowContinueOrRollbackOrApplyWithRequestTransitionShowContinue then display Continue" in {
       journeyState.set(State.Start, Nil)
-      val result = controller.showWithRollbackOrApplyContinueDsl2(fakeRequest)
+      val result =
+        controller.whenAuthorisedShowContinueOrRollbackOrApplyWithRequestTransitionShowContinue(
+          fakeRequest
+        )
       status(result) shouldBe 200
       journeyState.get should have[State](
         State.Continue("yummy"),
@@ -324,9 +361,10 @@ class DummyJourneyControllerSpec
       )
     }
 
-    "show+apply2: after GET /continue show new Continue when in Start" in {
+    "given Start whenAuthorisedShowContinueOrApplyWithRequestTransitionShowContinue then display Continue" in {
       journeyState.set(State.Start, Nil)
-      val result = controller.showOrApplyContinueDsl2(fakeRequest)
+      val result =
+        controller.whenAuthorisedShowContinueOrApplyWithRequestTransitionShowContinue(fakeRequest)
       status(result) shouldBe 200
       journeyState.get should have[State](
         State.Continue("yummy"),
@@ -334,37 +372,119 @@ class DummyJourneyControllerSpec
       )
     }
 
-    "show+rollback+apply: after GET /continue show Continue when in Continue" in {
+    "given Start whenAuthorisedShowContinueOrRedirectToCurrentState then redirect to Start" in {
+      journeyState.set(State.Start, Nil)
+      val result =
+        controller.whenAuthorisedShowContinueOrRedirectToCurrentState(fakeRequest)
+      status(result) shouldBe 303
+      journeyState.get should have[State](
+        State.Start,
+        Nil
+      )
+    }
+
+    "given Start whenAuthorisedShowContinueOrRedirectToStart then redirect to Start" in {
+      journeyState.set(State.Start, Nil)
+      val result =
+        controller.whenAuthorisedShowContinueOrRedirectToStart(fakeRequest)
+      status(result) shouldBe 303
+      journeyState.get should have[State](
+        State.Start,
+        Nil
+      )
+    }
+
+    "given Start whenAuthorisedShowContinueOrReturn then return 406" in {
+      journeyState.set(State.Start, Nil)
+      val result =
+        controller.whenAuthorisedShowContinueOrReturn(fakeRequest)
+      status(result) shouldBe 406
+      journeyState.get should have[State](
+        State.Start,
+        Nil
+      )
+    }
+
+    "given Start whenAuthorisedShowContinueOrRedirectTo then redirect to /dummy" in {
+      journeyState.set(State.Start, Nil)
+      val result =
+        controller.whenAuthorisedShowContinueOrRedirectTo(fakeRequest)
+      status(result) shouldBe 303
+      journeyState.get should have[State](
+        State.Start,
+        Nil
+      )
+    }
+
+    "given Continue whenAuthorisedShowContinueOrRollbackOrApplyTransitionShowContinue then display Continue" in {
       journeyState.set(State.Continue("dummy"), List(State.Start))
-      val result = controller.showWithRollbackOrApplyContinueDsl(fakeRequest)
+      val result =
+        controller.whenAuthorisedShowContinueOrRollbackOrApplyTransitionShowContinue(fakeRequest)
       status(result) shouldBe 200
       journeyState.get should have[State](State.Continue("dummy"), List(State.Start))
     }
 
-    "show+apply: after GET /continue show Continue when in Continue" in {
+    "given Continue whenAuthorisedShowContinueOrApplyShowContinue then display Continue" in {
       journeyState.set(State.Continue("dummy"), List(State.Start))
-      val result = controller.showOrApplyContinueDsl(fakeRequest)
+      val result = controller.whenAuthorisedShowContinueOrApplyShowContinue(fakeRequest)
       status(result) shouldBe 200
       journeyState.get should have[State](State.Continue("dummy"), List(State.Start))
     }
 
-    "show+rollback+apply2: after GET /continue show Continue when in Continue" in {
+    "given Continue whenAuthorisedShowContinueOrRollbackOrApplyWithRequestTransitionShowContinue then display Continue" in {
       journeyState.set(State.Continue("dummy"), List(State.Start))
-      val result = controller.showWithRollbackOrApplyContinueDsl2(fakeRequest)
+      val result =
+        controller.whenAuthorisedShowContinueOrRollbackOrApplyWithRequestTransitionShowContinue(
+          fakeRequest
+        )
       status(result) shouldBe 200
       journeyState.get should have[State](State.Continue("dummy"), List(State.Start))
     }
 
-    "show+apply2: after GET /continue show Continue when in Continue" in {
+    "given Continue whenAuthorisedShowContinueOrApplyWithRequestTransitionShowContinue then display Continue" in {
       journeyState.set(State.Continue("dummy"), List(State.Start))
-      val result = controller.showOrApplyContinueDsl2(fakeRequest)
+      val result =
+        controller.whenAuthorisedShowContinueOrApplyWithRequestTransitionShowContinue(fakeRequest)
       status(result) shouldBe 200
       journeyState.get should have[State](State.Continue("dummy"), List(State.Start))
     }
 
-    "show+rollback+apply: after GET /continue show new Continue when in Stop" in {
+    "given Continue whenAuthorisedShowContinueOrRedirectToCurrentState then display Continue" in {
+      journeyState.set(State.Continue("dummy"), List(State.Start))
+      val result =
+        controller.whenAuthorisedShowContinueOrRedirectToCurrentState(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](State.Continue("dummy"), List(State.Start))
+    }
+
+    "given Continue whenAuthorisedShowContinueOrRedirectToStart then display Continue" in {
+      journeyState.set(State.Continue("dummy"), List(State.Start))
+      val result =
+        controller.whenAuthorisedShowContinueOrRedirectToStart(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](State.Continue("dummy"), List(State.Start))
+    }
+
+    "given Continue whenAuthorisedShowContinueOrReturn then display Continue" in {
+      journeyState.set(State.Continue("dummy"), List(State.Start))
+      val result =
+        controller.whenAuthorisedShowContinueOrReturn(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](State.Continue("dummy"), List(State.Start))
+    }
+
+    "given Continue whenAuthorisedShowContinueOrRedirectTo then display Continue" in {
+      journeyState.set(State.Continue("dummy"), List(State.Start))
+      val result =
+        controller.whenAuthorisedShowContinueOrRedirectTo(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](State.Continue("dummy"), List(State.Start))
+    }
+
+    "given Stop whenAuthorisedShowContinueOrRollbackOrApplyTransitionShowContinue then rollback to Continue" in {
       journeyState.set(State.Stop("dummy"), List(State.Continue("dummy"), State.Start))
-      val result = controller.showWithRollbackOrApplyContinueDsl(fakeRequest)
+      val result =
+        controller.whenAuthorisedShowContinueOrRollbackOrApplyTransitionShowContinue(fakeRequest)
       status(result) shouldBe 200
       journeyState.get should have[State](
         State.Continue("dummy"),
@@ -372,9 +492,9 @@ class DummyJourneyControllerSpec
       )
     }
 
-    "show+apply: after GET /continue show new Continue when in Stop" in {
+    "given Stop whenAuthorisedShowContinueOrApplyShowContinue choose apply and display Continue" in {
       journeyState.set(State.Stop("dummy"), List(State.Continue("dummy"), State.Start))
-      val result = controller.showOrApplyContinueDsl(fakeRequest)
+      val result = controller.whenAuthorisedShowContinueOrApplyShowContinue(fakeRequest)
       status(result) shouldBe 200
       journeyState.get should have[State](
         State.Continue("ymmud"),
@@ -382,9 +502,12 @@ class DummyJourneyControllerSpec
       )
     }
 
-    "show+rollback+apply2: after GET /continue show new Continue when in Stop" in {
+    "given Stop whenAuthorisedShowContinueOrRollbackOrApplyWithRequestTransitionShowContinue then rollback to Continue" in {
       journeyState.set(State.Stop("dummy"), List(State.Continue("dummy"), State.Start))
-      val result = controller.showWithRollbackOrApplyContinueDsl2(fakeRequest)
+      val result =
+        controller.whenAuthorisedShowContinueOrRollbackOrApplyWithRequestTransitionShowContinue(
+          fakeRequest
+        )
       status(result) shouldBe 200
       journeyState.get should have[State](
         State.Continue("dummy"),
@@ -392,19 +515,64 @@ class DummyJourneyControllerSpec
       )
     }
 
-    "show+apply2: after GET /continue show new Continue when in Stop" in {
+    "given Stop whenAuthorisedShowContinueOrApplyWithRequestTransitionShowContinue choose apply and display Continue" in {
       journeyState.set(State.Stop("dummy"), List(State.Continue("dummy"), State.Start))
-      val result = controller.showOrApplyContinueDsl2(fakeRequest)
+      val result =
+        controller.whenAuthorisedShowContinueOrApplyWithRequestTransitionShowContinue(fakeRequest)
       status(result) shouldBe 200
       journeyState.get should have[State](
         State.Continue("ymmud"),
         List(State.Stop("dummy"), State.Continue("dummy"), State.Start)
+      )
+    }
+
+    "given Stop whenAuthorisedShowContinueOrRedirectToCurrentState then redirect to Stop" in {
+      journeyState.set(State.Stop("dummy"), List(State.Continue("dummy"), State.Start))
+      val result =
+        controller.whenAuthorisedShowContinueOrRedirectToCurrentState(fakeRequest)
+      status(result) shouldBe 303
+      journeyState.get should have[State](
+        State.Stop("dummy"),
+        List(State.Continue("dummy"), State.Start)
+      )
+    }
+
+    "given Stop whenAuthorisedShowContinueOrRedirectToStart then redirect to Start" in {
+      journeyState.set(State.Stop("dummy"), List(State.Continue("dummy"), State.Start))
+      val result =
+        controller.whenAuthorisedShowContinueOrRedirectToStart(fakeRequest)
+      status(result) shouldBe 303
+      journeyState.get should have[State](
+        State.Start,
+        Nil
+      )
+    }
+
+    "given Stop whenAuthorisedShowContinueOrReturn then return 406" in {
+      journeyState.set(State.Stop("dummy"), List(State.Continue("dummy"), State.Start))
+      val result =
+        controller.whenAuthorisedShowContinueOrReturn(fakeRequest)
+      status(result) shouldBe 406
+      journeyState.get should have[State](
+        State.Stop("dummy"),
+        List(State.Continue("dummy"), State.Start)
+      )
+    }
+
+    "given Stop whenAuthorisedShowContinueOrRedirectTo then redirect to /dummy" in {
+      journeyState.set(State.Stop("dummy"), List(State.Continue("dummy"), State.Start))
+      val result =
+        controller.whenAuthorisedShowContinueOrRedirectTo(fakeRequest)
+      status(result) shouldBe 303
+      journeyState.get should have[State](
+        State.Stop("dummy"),
+        List(State.Continue("dummy"), State.Start)
       )
     }
 
     "dsl+merge: after GET /continue show merged Continue when in Stop" in {
       journeyState.set(State.Stop("dummy"), List(State.Continue("dummy"), State.Start))
-      val result = controller.showWithRollbackContinueDsl2(fakeRequest)
+      val result = controller.whenAuthorisedShowContinueOrRollbackUsing(fakeRequest)
       status(result) shouldBe 200
       journeyState.get should have[State](
         State.Continue("dummy_dummy"),
@@ -414,28 +582,29 @@ class DummyJourneyControllerSpec
 
     "after GET /continue go to Start when in Stop but no breadcrumbs" in {
       journeyState.set(State.Stop("dummy"), Nil)
-      val result = controller.showContinue(fakeRequest)
+      val result = controller.oldShowContinue(fakeRequest)
       status(result) shouldBe 303
       journeyState.get should have[State](State.Start, Nil)
     }
 
     "dsl: after GET /continue go to Start when in Stop but no breadcrumbs" in {
       journeyState.set(State.Stop("dummy"), Nil)
-      val result = controller.showWithRollbackContinueDsl(fakeRequest)
+      val result = controller.whenAuthorisedShowContinueOrRollback(fakeRequest)
       status(result) shouldBe 303
       journeyState.get should have[State](State.Start, Nil)
     }
 
     "dsl2: after GET /continue show new Continue when in Stop but no breadcrumbs" in {
       journeyState.set(State.Stop("dummy"), Nil)
-      val result = controller.showWithRollbackOrApplyContinueDsl(fakeRequest)
+      val result =
+        controller.whenAuthorisedShowContinueOrRollbackOrApplyTransitionShowContinue(fakeRequest)
       status(result) shouldBe 200
       journeyState.get should have[State](State.Continue("ymmud"), List(State.Stop("dummy")))
     }
 
     "after POST /stop transition to Stop when in Start" in {
       journeyState.set(State.Start, Nil)
-      val result = controller.stop(fakeRequest)
+      val result = controller.oldStop(fakeRequest)
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/stop")
       journeyState.get           should have[State](State.Stop(""), List(State.Start))
@@ -443,7 +612,7 @@ class DummyJourneyControllerSpec
 
     "dsl: after POST /stop transition to Stop when in Start" in {
       journeyState.set(State.Start, Nil)
-      val result = controller.stopDsl(fakeRequest)
+      val result = controller.whenAuthorisedApplyTransitionStop(fakeRequest)
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/stop")
       journeyState.get           should have[State](State.Stop(""), List(State.Start))
@@ -451,7 +620,7 @@ class DummyJourneyControllerSpec
 
     "dsl2: after POST /stop transition to Stop when in Start" in {
       journeyState.set(State.Start, Nil)
-      val result = controller.stopDsl2(fakeRequest)
+      val result = controller.whenAuthorisedApplyWithRequestTransitionStop(fakeRequest)
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/stop")
       journeyState.get           should have[State](State.Stop(""), List(State.Start))
@@ -459,7 +628,7 @@ class DummyJourneyControllerSpec
 
     "dsl3: after POST /stop transition to Stop when in Start" in {
       journeyState.set(State.Start, Nil)
-      val result = controller.stopDsl3(fakeRequest)
+      val result = controller.whenAuthorisedApplyTransitionStopRedirectOrDisplayIfSame(fakeRequest)
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/stop")
       journeyState.get           should have[State](State.Stop(""), List(State.Start))
@@ -467,7 +636,7 @@ class DummyJourneyControllerSpec
 
     "after POST /stop transition to Stop when in Continue" in {
       journeyState.set(State.Continue("dummy"), List(State.Start))
-      val result = controller.stop(fakeRequest)
+      val result = controller.oldStop(fakeRequest)
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/stop")
       journeyState.get should have[State](
@@ -478,7 +647,7 @@ class DummyJourneyControllerSpec
 
     "dsl: after POST /stop transition to Stop when in Continue" in {
       journeyState.set(State.Continue("dummy"), List(State.Start))
-      val result = controller.stopDsl(fakeRequest)
+      val result = controller.whenAuthorisedApplyTransitionStop(fakeRequest)
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/stop")
       journeyState.get should have[State](
@@ -489,7 +658,7 @@ class DummyJourneyControllerSpec
 
     "dsl2: after POST /stop transition to Stop when in Continue" in {
       journeyState.set(State.Continue("dummy"), List(State.Start))
-      val result = controller.stopDsl2(fakeRequest)
+      val result = controller.whenAuthorisedApplyWithRequestTransitionStop(fakeRequest)
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/stop")
       journeyState.get should have[State](
@@ -500,7 +669,7 @@ class DummyJourneyControllerSpec
 
     "dsl3: after POST /stop transition to Stop when in Continue" in {
       journeyState.set(State.Continue("dummy"), List(State.Start))
-      val result = controller.stopDsl3(fakeRequest)
+      val result = controller.whenAuthorisedApplyTransitionStopRedirectOrDisplayIfSame(fakeRequest)
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/stop")
       journeyState.get should have[State](
@@ -511,7 +680,7 @@ class DummyJourneyControllerSpec
 
     "dsl4: after POST /stop transition to Stop when in Continue" in {
       journeyState.set(State.Continue("dummy"), List(State.Start))
-      val result = controller.stopDsl4(fakeRequest)
+      val result = controller.applyTransitionStopRedirectOrDisplayIfSame(fakeRequest)
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/stop")
       journeyState.get should have[State](
@@ -628,7 +797,7 @@ class DummyJourneyControllerSpec
 
     "after POST /stop stay in Stop when in Stop" in {
       journeyState.set(State.Stop("dummy"), List(State.Start))
-      val result = controller.stop(fakeRequest)
+      val result = controller.oldStop(fakeRequest)
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/stop")
       journeyState.get           should have[State](State.Stop("dummy"), List(State.Start))
@@ -636,7 +805,7 @@ class DummyJourneyControllerSpec
 
     "dsl: after POST /stop stay in Stop when in Stop" in {
       journeyState.set(State.Stop("dummy"), List(State.Start))
-      val result = controller.stopDsl(fakeRequest)
+      val result = controller.whenAuthorisedApplyTransitionStop(fakeRequest)
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/stop")
       journeyState.get           should have[State](State.Stop("dummy"), List(State.Start))
@@ -644,7 +813,7 @@ class DummyJourneyControllerSpec
 
     "dsl2: after POST /stop stay in Stop when in Stop" in {
       journeyState.set(State.Stop("dummy"), List(State.Start))
-      val result = controller.stopDsl2(fakeRequest)
+      val result = controller.whenAuthorisedApplyWithRequestTransitionStop(fakeRequest)
       status(result)           shouldBe 303
       redirectLocation(result) shouldBe Some("/stop")
       journeyState.get           should have[State](State.Stop("dummy"), List(State.Start))
@@ -652,7 +821,7 @@ class DummyJourneyControllerSpec
 
     "dsl3: after POST /stop stay in Stop when in Stop" in {
       journeyState.set(State.Stop("dummy"), List(State.Start))
-      val result = controller.stopDsl3(fakeRequest)
+      val result = controller.whenAuthorisedApplyTransitionStopRedirectOrDisplayIfSame(fakeRequest)
       status(result) shouldBe 200
       journeyState.get should have[State](State.Stop("dummy"), List(State.Start))
     }
