@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 HM Revenue & Customs
+ * Copyright 2021 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,6 +41,10 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
   }
 
   // ACTIONS
+
+  val doNothing: Action[AnyContent] =
+    actions
+      .apply(Transitions.doNothing)
 
   val oldStart: Action[AnyContent] = action { implicit request =>
     journeyService
@@ -84,11 +88,50 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
       whenAuthorisedWithForm(asUser)(ArgForm)(Transitions.continue)
     }
 
+  def bindFormAndApplyTransitionContinue: Action[AnyContent] =
+    actions
+      .bindForm(ArgForm)
+      .apply(Transitions.continue(0))
+
+  def bindFormAndApplyWithRequestTransitionContinue: Action[AnyContent] =
+    actions
+      .bindForm(ArgForm)
+      .applyWithRequest(_ => Transitions.continue(0))
+
+  def bindFormDerivedFromStateAndApplyTransitionContinue: Action[AnyContent] =
+    actions
+      .bindFormDerivedFromState(_ => ArgForm)
+      .apply(Transitions.continue(1))
+
+  def bindFormDerivedFromStateAndApplyWithRequestTransitionContinue: Action[AnyContent] =
+    actions
+      .bindFormDerivedFromState(_ => ArgForm)
+      .applyWithRequest(_ => Transitions.continue(1))
+
   def whenAuthorisedBindFormAndApplyTransitionContinue: Action[AnyContent] =
     actions
       .whenAuthorised(asUser)
       .bindForm(ArgForm)
       .apply(Transitions.continue)
+
+  def whenAuthorisedBindFormAndApplyWithRequestTransitionContinue: Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .bindForm(ArgForm)
+      .applyWithRequest(_ => Transitions.continue)
+
+  def whenAuthorisedBindFormDerivedFromStateAndApplyTransitionContinue: Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .bindFormDerivedFromState(_ => ArgForm)
+      .apply(Transitions.continue)
+
+  def whenAuthorisedBindFormDerivedFromStateAndApplyWithRequestTransitionContinue
+    : Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .bindFormDerivedFromState(_ => ArgForm)
+      .applyWithRequest(_ => Transitions.continue)
 
   def continueDsl2: Action[AnyContent] =
     actions
