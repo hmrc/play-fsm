@@ -340,6 +340,17 @@ or
             .apply(Transitions.processFormInput)
 ```
 
+- bind the form, derived from the current state, and apply transition if success, otherwise redirect to the current page with failed form flashed in
+
+```
+    val processForm: Action[AnyContent] = 
+        actions
+            .bindFormDerivedFromState(currentState => 
+                Forms.myForm(currentState.foo)
+            )
+            .apply(Transitions.processFormInput)
+```
+
 - parse json payload and apply transition if success, otherwise use recovery strategy
 
 ```

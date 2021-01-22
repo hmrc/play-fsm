@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 HM Revenue & Customs
+ * Copyright 2021 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -544,6 +544,41 @@ trait JourneyController[RequestContext] {
       )
 
   /**
+    * Bind form derived from the current state and apply transition if success,
+    * otherwise redirect to the current state with form errors in the flash scope.
+    */
+  protected final def bindFormDerivedFromState[T](
+    form: State => Form[T],
+    transition: T => Transition,
+    outcomeFactory: OutcomeFactory,
+    fallback: => Future[Result]
+  )(implicit
+    rc: RequestContext,
+    request: Request[_],
+    ec: ExecutionContext
+  ): Future[Result] =
+    journeyService.currentState.flatMap {
+      case Some((state, _)) =>
+        form(state)
+          .bindFromRequest()
+          .fold(
+            formWithErrors =>
+              Future.successful(
+                Results
+                  .Redirect(getCallFor(state))
+                  .flashing(Flash {
+                    val data = formWithErrors.data
+                    // dummy parameter required if empty data
+                    if (data.isEmpty) Map("dummy" -> "") else data
+                  })
+              ),
+            userInput => apply(transition(userInput), outcomeFactory)
+          )
+      case None =>
+        fallback
+    }
+
+  /**
     * Parse request's body as JSON and apply transition if success,
     * otherwise return ifFailure result.
     */
@@ -902,7 +937,7 @@ trait JourneyController[RequestContext] {
       * If there is no state yet then redirects to the start.
       * @note follow with [[renderUsing]] to change the default renderer.
       */
-    val showCurrentState: Executable = new ShowCurrentState()
+    final val showCurrentState: Executable = new ShowCurrentState()
 
     final class ShowCurrentState private[actions] () extends Executable {
       override def execute(
@@ -936,7 +971,7 @@ trait JourneyController[RequestContext] {
       * - [[orReturn]]
       * - [[orRedirectTo]]
       */
-    def show[S <: State: ClassTag]: Show[S] =
+    final def show[S <: State: ClassTag]: Show[S] =
       new Show[S](
         rollback = false,
         merger = None,
@@ -949,7 +984,7 @@ trait JourneyController[RequestContext] {
       fallback: Fallback
     ) extends Executable {
 
-      val defaultOutcomeFactory: OutcomeFactory =
+      final val defaultOutcomeFactory: OutcomeFactory =
         JourneyController.this.redirectOrDisplayIf[S]
 
       override def execute(
@@ -976,7 +1011,8 @@ trait JourneyController[RequestContext] {
         *
         * @note to alter behaviour follow with [[orApply]] or [[orApplyWithRequest]]
         */
-      def orRollback: Show[S] = new Show[S](rollback = true, merger = None, fallback = fallback)
+      final def orRollback: Show[S] =
+        new Show[S](rollback = true, merger = None, fallback = fallback)
 
       /**
         * Modify [[show]] behaviour:
@@ -990,7 +1026,7 @@ trait JourneyController[RequestContext] {
         *
         * @note to alter behaviour follow with [[orApply]] or [[orApplyWithRequest]]
         */
-      def orRollbackUsing(merger: Merger[S]): Show[S] =
+      final def orRollbackUsing(merger: Merger[S]): Show[S] =
         new Show[S](rollback = true, merger = Some(merger), fallback = fallback)
 
       /**
@@ -1003,7 +1039,7 @@ trait JourneyController[RequestContext] {
         * If transition is not allowed then redirect back to the current state.
         * @tparam S type of the state to display
         */
-      def orApply(transition: Transition): OrApply = new OrApply(transition)
+      final def orApply(transition: Transition): OrApply = new OrApply(transition)
 
       final class OrApply private[actions] (transition: Transition) extends Executable {
         override def execute(
@@ -1031,7 +1067,7 @@ trait JourneyController[RequestContext] {
         * If transition is not allowed then redirect back to the current state.
         * @tparam S type of the state to display
         */
-      def orApplyWithRequest(transition: Request[_] => Transition): OrApplyWithRequest =
+      final def orApplyWithRequest(transition: Request[_] => Transition): OrApplyWithRequest =
         new OrApplyWithRequest(transition)
 
       final class OrApplyWithRequest private[actions] (transition: Request[_] => Transition)
@@ -1059,7 +1095,7 @@ trait JourneyController[RequestContext] {
         * Redirect to the current state if not S,
         * instead of using the default show fallback.
         */
-      def orRedirectToCurrentState: Show[S] =
+      final def orRedirectToCurrentState: Show[S] =
         new Show[S](
           rollback = rollback,
           merger = merger,
@@ -1071,7 +1107,7 @@ trait JourneyController[RequestContext] {
         * Redirect to the Start state if current state is not of S type,
         * instead of using the default show fallback.
         */
-      def orRedirectToStart: Show[S] =
+      final def orRedirectToStart: Show[S] =
         new Show[S](
           rollback = rollback,
           merger = merger,
@@ -1083,7 +1119,7 @@ trait JourneyController[RequestContext] {
         * Return the given result if current state is not of S type,
         * instead of using the default show fallback.
         */
-      def orReturn(result: => Result): Show[S] =
+      final def orReturn(result: => Result): Show[S] =
         new Show[S](
           rollback = rollback,
           merger = merger,
@@ -1095,7 +1131,7 @@ trait JourneyController[RequestContext] {
         * Redirect to the given call if current state is not of S type,
         * instead of using the default show fallback.
         */
-      def orRedirectTo(call: Call): Show[S] =
+      final def orRedirectTo(call: Call): Show[S] =
         new Show[S](
           rollback = rollback,
           merger = merger,
@@ -1108,7 +1144,7 @@ trait JourneyController[RequestContext] {
       *
       * @note to alter behaviour follow with [[redirectOrDisplayIfSame]] or [[redirectOrDisplayIf]]
       */
-    def apply(transition: Transition): Apply = new Apply(transition)
+    final def apply(transition: Transition): Apply = new Apply(transition)
 
     final class Apply private[actions] (transition: Transition) extends Executable {
       override def execute(
@@ -1121,7 +1157,7 @@ trait JourneyController[RequestContext] {
     }
 
     /** Apply state transition and redirect to the new state. */
-    def applyWithRequest(transition: Request[_] => Transition): ApplyWithRequest =
+    final def applyWithRequest(transition: Request[_] => Transition): ApplyWithRequest =
       new ApplyWithRequest(transition)
 
     final class ApplyWithRequest private[actions] (transition: Request[_] => Transition)
@@ -1144,7 +1180,7 @@ trait JourneyController[RequestContext] {
       * if not valid, redirect back to the current state with failed form.
       * @tparam Payload form output type
       */
-    def bindForm[Payload](form: Form[Payload]): BindForm[Payload] =
+    final def bindForm[Payload](form: Form[Payload]): BindForm[Payload] =
       new BindForm[Payload](form)
 
     final class BindForm[Payload] private[actions] (form: Form[Payload]) {
@@ -1153,7 +1189,7 @@ trait JourneyController[RequestContext] {
         * Apply the state transition parametrized by the form output
         * and redirect to the URL matching the new state.
         */
-      def apply(transition: Payload => Transition): Apply = new Apply(transition)
+      final def apply(transition: Payload => Transition): Apply = new Apply(transition)
 
       final class Apply private[actions] (transition: Payload => Transition) extends Executable {
         override def execute(
@@ -1173,7 +1209,9 @@ trait JourneyController[RequestContext] {
         * Apply the state transition parametrized by the form output
         * and redirect to the URL matching the new state.
         */
-      def applyWithRequest(transition: Request[_] => Payload => Transition): ApplyWithRequest =
+      final def applyWithRequest(
+        transition: Request[_] => Payload => Transition
+      ): ApplyWithRequest =
         new ApplyWithRequest(transition)
 
       final class ApplyWithRequest private[actions] (
@@ -1194,12 +1232,71 @@ trait JourneyController[RequestContext] {
     }
 
     /**
+      * Bind the form, derived from the current state, to the request.
+      * If valid, apply the following transition,
+      * if not valid, redirect back to the current state with failed form.
+      * @tparam Payload form output type
+      */
+    final def bindFormDerivedFromState[Payload](
+      form: State => Form[Payload]
+    ): BindFormDerivedFromState[Payload] =
+      new BindFormDerivedFromState[Payload](form)
+
+    final class BindFormDerivedFromState[Payload] private[actions] (form: State => Form[Payload]) {
+
+      /**
+        * Apply the state transition parametrized by the form output
+        * and redirect to the URL matching the new state.
+        */
+      final def apply(transition: Payload => Transition): Apply = new Apply(transition)
+
+      final class Apply private[actions] (transition: Payload => Transition) extends Executable {
+        override def execute(
+          settings: Settings
+        )(implicit request: Request[_], ec: ExecutionContext): Future[Result] = {
+          implicit val rc: RequestContext = JourneyController.this.context(request)
+          JourneyController.this.bindFormDerivedFromState(
+            form,
+            transition,
+            settings.outcomeFactoryWithDefault(JourneyController.this.redirect),
+            redirectToStart
+          )
+        }
+      }
+
+      /**
+        * Apply the state transition parametrized by the form output
+        * and redirect to the URL matching the new state.
+        */
+      final def applyWithRequest(
+        transition: Request[_] => Payload => Transition
+      ): ApplyWithRequest =
+        new ApplyWithRequest(transition)
+
+      final class ApplyWithRequest private[actions] (
+        transition: Request[_] => Payload => Transition
+      ) extends Executable {
+        override def execute(
+          settings: Settings
+        )(implicit request: Request[_], ec: ExecutionContext): Future[Result] = {
+          implicit val rc: RequestContext = JourneyController.this.context(request)
+          JourneyController.this.bindFormDerivedFromState(
+            form,
+            transition(request),
+            settings.outcomeFactoryWithDefault(JourneyController.this.redirect),
+            redirectToStart
+          )
+        }
+      }
+    }
+
+    /**
       * Parse the JSON body of the request.
       * If valid, apply the following transition,
       * if not valid, return the alternative result.
       * @tparam Entity entity
       */
-    def parseJson[Entity: Reads]: ParseJson[Entity] = new ParseJson[Entity]
+    final def parseJson[Entity: Reads]: ParseJson[Entity] = new ParseJson[Entity]
 
     final class ParseJson[Entity: Reads] private[actions] {
 
@@ -1207,7 +1304,7 @@ trait JourneyController[RequestContext] {
         * Parse request's body as JSON and apply the state transition if success,
         * otherwise return ifFailure result.
         */
-      def apply(transition: Entity => Transition): Apply = new Apply(transition)
+      final def apply(transition: Entity => Transition): Apply = new Apply(transition)
 
       final class Apply private[actions] (transition: Entity => Transition) extends Executable {
         override def execute(
@@ -1225,7 +1322,7 @@ trait JourneyController[RequestContext] {
         * Parse request's body as JSON and apply the state transition if success,
         * otherwise return ifFailure result.
         */
-      def applyWithRequest(transition: Request[_] => Entity => Transition): ApplyWithRequest =
+      final def applyWithRequest(transition: Request[_] => Entity => Transition): ApplyWithRequest =
         new ApplyWithRequest(transition)
 
       final class ApplyWithRequest private[actions] (transition: Request[_] => Entity => Transition)
@@ -1246,14 +1343,14 @@ trait JourneyController[RequestContext] {
       * Wait until the state becomes of S type and display it using default [[renderState]],
       * or if timeout expires raise a [[java.util.concurrent.TimeoutException]].
       */
-    def waitForStateAndDisplay[S <: State: ClassTag](timeoutInSeconds: Int): WaitFor[S] =
+    final def waitForStateAndDisplay[S <: State: ClassTag](timeoutInSeconds: Int): WaitFor[S] =
       new WaitFor[S](timeoutInSeconds)(display)
 
     /**
       * Wait until the state becomes of S type and display it using custom renderer,
       * or if timeout expires raise a [[java.util.concurrent.TimeoutException]].
       */
-    def waitForStateAndDisplayUsing[S <: State: ClassTag](
+    final def waitForStateAndDisplayUsing[S <: State: ClassTag](
       timeoutInSeconds: Int,
       renderer: Renderer
     ): WaitFor[S] =
@@ -1263,7 +1360,7 @@ trait JourneyController[RequestContext] {
       * Wait until the state becomes of S type and redirect to it,
       * or if timeout expires raise a [[java.util.concurrent.TimeoutException]].
       */
-    def waitForStateThenRedirect[S <: State: ClassTag](timeoutInSeconds: Int): WaitFor[S] =
+    final def waitForStateThenRedirect[S <: State: ClassTag](timeoutInSeconds: Int): WaitFor[S] =
       new WaitFor[S](timeoutInSeconds)(redirect)
 
     final class WaitFor[S <: State: ClassTag] private[actions] (timeoutInSeconds: Int)(
@@ -1292,7 +1389,7 @@ trait JourneyController[RequestContext] {
         *
         * @note follow with [[display]] or [[redirectOrDisplayIf]] to display instead of redirecting.
         */
-      def orApplyOnTimeout(transition: Request[_] => Transition): OrApply =
+      final def orApplyOnTimeout(transition: Request[_] => Transition): OrApply =
         new OrApply(transition)
 
       final class OrApply private[actions] (transition: Request[_] => Transition)
@@ -1321,7 +1418,7 @@ trait JourneyController[RequestContext] {
       * Pass obtained user data to the subsequent operations.
       * @tparam User authorised user information type
       */
-    def whenAuthorised[User](withAuthorised: WithAuthorised[User]): WhenAuthorised[User] =
+    final def whenAuthorised[User](withAuthorised: WithAuthorised[User]): WhenAuthorised[User] =
       new WhenAuthorised[User](withAuthorised)
 
     final class WhenAuthorised[User] private[actions] (withAuthorised: WithAuthorised[User]) {
@@ -1332,7 +1429,7 @@ trait JourneyController[RequestContext] {
         *
         * @note follow with [[renderUsing]] to use different rendering function.
         */
-      val showCurrentState: Executable = new ShowCurrentState()
+      final val showCurrentState: Executable = new ShowCurrentState()
 
       final class ShowCurrentState private[actions] () extends Executable {
         override def execute(
@@ -1368,7 +1465,7 @@ trait JourneyController[RequestContext] {
         * - [[orReturn]]
         * - [[orRedirectTo]]
         */
-      def show[S <: State: ClassTag]: Show[S] =
+      final def show[S <: State: ClassTag]: Show[S] =
         new Show[S](
           rollback = false,
           merger = None,
@@ -1381,7 +1478,7 @@ trait JourneyController[RequestContext] {
         fallback: Fallback
       ) extends Executable {
 
-        val defaultOutcomeFactory: OutcomeFactory =
+        final val defaultOutcomeFactory: OutcomeFactory =
           JourneyController.this.redirectOrDisplayIf[S]
 
         override def execute(
@@ -1411,7 +1508,8 @@ trait JourneyController[RequestContext] {
           *
           * @note to alter behaviour follow with [[orApply]] or [[orApplyWithRequest]]
           */
-        def orRollback: Show[S] = new Show[S](rollback = true, merger = None, fallback = fallback)
+        final def orRollback: Show[S] =
+          new Show[S](rollback = true, merger = None, fallback = fallback)
 
         /**
           * Modify [[show]] behaviour:
@@ -1423,7 +1521,7 @@ trait JourneyController[RequestContext] {
           * **and apply merge function to reconcile the new state with the outgoing**,
           * or redirect back to the root state.
           */
-        def orRollbackUsing(merger: Merger[S]): Show[S] =
+        final def orRollbackUsing(merger: Merger[S]): Show[S] =
           new Show[S](rollback = true, merger = Some(merger), fallback = fallback)
 
         /**
@@ -1438,7 +1536,7 @@ trait JourneyController[RequestContext] {
           * If transition is not allowed then redirect back to the current state.
           * @tparam S type of the state to display
           */
-        def orApply(transition: User => Transition): OrApply = new OrApply(transition)
+        final def orApply(transition: User => Transition): OrApply = new OrApply(transition)
 
         final class OrApply private[actions] (transition: User => Transition) extends Executable {
           override def execute(
@@ -1476,7 +1574,9 @@ trait JourneyController[RequestContext] {
           * If transition is not allowed then redirect back to the current state.
           * @tparam S type of the state to display
           */
-        def orApplyWithRequest(transition: Request[_] => User => Transition): OrApplyWithRequest =
+        final def orApplyWithRequest(
+          transition: Request[_] => User => Transition
+        ): OrApplyWithRequest =
           new OrApplyWithRequest(transition)
 
         final class OrApplyWithRequest private[actions] (
@@ -1510,7 +1610,7 @@ trait JourneyController[RequestContext] {
           * Redirect to the current state if not S,
           * instead of using the default show fallback.
           */
-        def orRedirectToCurrentState: Show[S] =
+        final def orRedirectToCurrentState: Show[S] =
           new Show[S](
             rollback = rollback,
             merger = merger,
@@ -1522,7 +1622,7 @@ trait JourneyController[RequestContext] {
           * Redirect to the Start state if current state is not of S type,
           * instead of using the default show fallback.
           */
-        def orRedirectToStart: Show[S] =
+        final def orRedirectToStart: Show[S] =
           new Show[S](
             rollback = rollback,
             merger = merger,
@@ -1534,7 +1634,7 @@ trait JourneyController[RequestContext] {
           * Return the given result if current state is not of S type,
           * instead of using the default show fallback.
           */
-        def orReturn(result: => Result): Show[S] =
+        final def orReturn(result: => Result): Show[S] =
           new Show[S](
             rollback = rollback,
             merger = merger,
@@ -1546,7 +1646,7 @@ trait JourneyController[RequestContext] {
           * Redirect to the given call if current state is not of S type,
           * instead of using the default show fallback.
           */
-        def orRedirectTo(call: Call): Show[S] =
+        final def orRedirectTo(call: Call): Show[S] =
           new Show[S](
             rollback = rollback,
             merger = merger,
@@ -1560,7 +1660,7 @@ trait JourneyController[RequestContext] {
         *
         * @note to alter behaviour follow with [[redirectOrDisplayIfSame]] or [[redirectOrDisplayIf]]
         */
-      def apply(transition: User => Transition): Apply = new Apply(transition)
+      final def apply(transition: User => Transition): Apply = new Apply(transition)
 
       final class Apply private[actions] (transition: User => Transition) extends Executable {
         override def execute(
@@ -1580,7 +1680,7 @@ trait JourneyController[RequestContext] {
         * Apply state transition parametrized by the user information
         * and redirect to the URL matching the new state.
         */
-      def applyWithRequest(transition: Request[_] => User => Transition): ApplyWithRequest =
+      final def applyWithRequest(transition: Request[_] => User => Transition): ApplyWithRequest =
         new ApplyWithRequest(transition)
 
       final class ApplyWithRequest private[actions] (transition: Request[_] => User => Transition)
@@ -1603,7 +1703,7 @@ trait JourneyController[RequestContext] {
         * if not valid, redirect back to the current state with failed form.
         * @tparam Payload form output type
         */
-      def bindForm[Payload](form: Form[Payload]): BindForm[Payload] =
+      final def bindForm[Payload](form: Form[Payload]): BindForm[Payload] =
         new BindForm[Payload](form)
 
       final class BindForm[Payload] private[actions] (form: Form[Payload]) {
@@ -1612,7 +1712,7 @@ trait JourneyController[RequestContext] {
           * Apply state transition parametrized by the user information and form output
           * and redirect to the URL matching the end state.
           */
-        def apply(transition: User => Payload => Transition): Apply =
+        final def apply(transition: User => Payload => Transition): Apply =
           new Apply(transition)
 
         final class Apply private[actions] (transition: User => Payload => Transition)
@@ -1635,7 +1735,7 @@ trait JourneyController[RequestContext] {
           * Apply state transition parametrized by the user information and form output
           * and redirect to the URL matching the end state.
           */
-        def applyWithRequest(
+        final def applyWithRequest(
           transition: Request[_] => User => Payload => Transition
         ): ApplyWithRequest =
           new ApplyWithRequest(transition)
@@ -1659,12 +1759,79 @@ trait JourneyController[RequestContext] {
       }
 
       /**
+        * Bind the form to the request.
+        * If valid, apply the following transitions,
+        * if not valid, redirect back to the current state with failed form.
+        * @tparam Payload form output type
+        */
+      final def bindFormDerivedFromState[Payload](
+        form: State => Form[Payload]
+      ): BindFormDerivedFromState[Payload] =
+        new BindFormDerivedFromState[Payload](form)
+
+      final class BindFormDerivedFromState[Payload] private[actions] (
+        form: State => Form[Payload]
+      ) {
+
+        /**
+          * Apply state transition parametrized by the user information and form output
+          * and redirect to the URL matching the end state.
+          */
+        final def apply(transition: User => Payload => Transition): Apply =
+          new Apply(transition)
+
+        final class Apply private[actions] (transition: User => Payload => Transition)
+            extends Executable {
+          override def execute(
+            settings: Settings
+          )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+            withAuthorised(request) { user: User =>
+              implicit val rc: RequestContext = JourneyController.this.context(request)
+              JourneyController.this.bindFormDerivedFromState(
+                form,
+                transition(user),
+                settings.outcomeFactoryWithDefault(JourneyController.this.redirect),
+                redirectToStart
+              )
+            }
+        }
+
+        /**
+          * Apply state transition parametrized by the user information and form output
+          * and redirect to the URL matching the end state.
+          */
+        final def applyWithRequest(
+          transition: Request[_] => User => Payload => Transition
+        ): ApplyWithRequest =
+          new ApplyWithRequest(transition)
+
+        final class ApplyWithRequest private[actions] (
+          transition: Request[_] => User => Payload => Transition
+        ) extends Executable {
+          override def execute(
+            settings: Settings
+          )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+            withAuthorised(request) { user: User =>
+              implicit val rc: RequestContext = JourneyController.this.context(request)
+              JourneyController.this.bindFormDerivedFromState(
+                form,
+                transition(request)(user),
+                settings.outcomeFactoryWithDefault(JourneyController.this.redirect),
+                redirectToStart
+              )
+            }
+        }
+      }
+
+      /**
         * Parse the JSON body of the request.
         * If valid, apply the following transition,
         * if not valid, return the alternative result.
         * @tparam Entity entity
         */
-      def parseJson[Entity: Reads](ifFailure: Request[_] => Future[Result]): ParseJson[Entity] =
+      final def parseJson[Entity: Reads](
+        ifFailure: Request[_] => Future[Result]
+      ): ParseJson[Entity] =
         new ParseJson[Entity](ifFailure)
 
       final class ParseJson[Entity: Reads] private[actions] (
@@ -1675,7 +1842,7 @@ trait JourneyController[RequestContext] {
           * Parse request's body as JSON and apply the state transition if success,
           * otherwise return ifFailure result.
           */
-        def apply(transition: User => Entity => Transition): Apply = new Apply(transition)
+        final def apply(transition: User => Entity => Transition): Apply = new Apply(transition)
 
         final class Apply private[actions] (transition: User => Entity => Transition)
             extends Executable {
@@ -1698,7 +1865,7 @@ trait JourneyController[RequestContext] {
           * Parse request's body as JSON and apply the state transition if success,
           * otherwise return ifFailure result.
           */
-        def applyWithRequest(
+        final def applyWithRequest(
           transition: Request[_] => User => Entity => Transition
         ): ApplyWithRequest =
           new ApplyWithRequest(transition)
@@ -1726,14 +1893,14 @@ trait JourneyController[RequestContext] {
         * Wait until the state becomes of S type and display it using default [[renderState]],
         * or if timeout expires raise a [[java.util.concurrent.TimeoutException]].
         */
-      def waitForStateAndDisplay[S <: State: ClassTag](timeoutInSeconds: Int): WaitFor[S] =
+      final def waitForStateAndDisplay[S <: State: ClassTag](timeoutInSeconds: Int): WaitFor[S] =
         new WaitFor[S](timeoutInSeconds)(display)
 
       /**
         * Wait until the state becomes of S type and display it using custom renderer,
         * or if timeout expires raise a [[java.util.concurrent.TimeoutException]].
         */
-      def waitForStateAndDisplayUsing[S <: State: ClassTag](
+      final def waitForStateAndDisplayUsing[S <: State: ClassTag](
         timeoutInSeconds: Int,
         renderer: Renderer
       ): WaitFor[S] =
@@ -1743,7 +1910,7 @@ trait JourneyController[RequestContext] {
         * Wait until the state becomes of S type and redirect to it,
         * or if timeout expires raise a [[java.util.concurrent.TimeoutException]].
         */
-      def waitForStateThenRedirect[S <: State: ClassTag](timeoutInSeconds: Int): WaitFor[S] =
+      final def waitForStateThenRedirect[S <: State: ClassTag](timeoutInSeconds: Int): WaitFor[S] =
         new WaitFor[S](timeoutInSeconds)(redirect)
 
       final class WaitFor[S <: State: ClassTag] private[actions] (timeoutInSeconds: Int)(
@@ -1773,7 +1940,7 @@ trait JourneyController[RequestContext] {
           *
           * @note follow with [[display]] or [[redirectOrDisplayIf]] to display instead of redirecting.
           */
-        def orApplyOnTimeout(transition: Request[_] => User => Transition): OrApply =
+        final def orApplyOnTimeout(transition: Request[_] => User => Transition): OrApply =
           new OrApply(transition)
 
         final class OrApply private[actions] (transition: Request[_] => User => Transition)
