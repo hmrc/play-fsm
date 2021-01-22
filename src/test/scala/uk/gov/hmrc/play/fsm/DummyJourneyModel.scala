@@ -40,6 +40,11 @@ object DummyJourneyModel extends JourneyModel {
         case Stop(curr) => goto(Continue(curr.reverse))
       }
 
+    def doNothing =
+      Transition {
+        case _          => stay
+      }  
+
     def continue(user: Int)(arg: String) =
       Transition {
         case Start          => goto(Continue(arg))

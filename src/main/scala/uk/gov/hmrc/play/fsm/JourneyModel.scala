@@ -57,6 +57,8 @@ trait JourneyModel {
   case class TransitionNotAllowed(state: State, breadcrumbs: List[State], transition: Transition)
       extends Exception
 
+  case object StayInCurrentState extends Exception
+
   /**
     * Merger is a partial function of type `(S <: State, State) => S`,
     * used to reconcile current and previous states when rolling back the journey.
@@ -91,4 +93,7 @@ trait JourneyModel {
 
   /** Fail the transition */
   final def fail[T](exception: Exception): Future[T] = Future.failed(exception)
+
+  /** Stay in the current state */
+  final def stay[T]: Future[T] = Future.failed(StayInCurrentState)
 }

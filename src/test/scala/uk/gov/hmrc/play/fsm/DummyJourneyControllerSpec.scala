@@ -54,6 +54,29 @@ class DummyJourneyControllerSpec
   def fakeRequest = FakeRequest()
 
   "DummyJourneyController" should {
+
+    "stay in Start when doNothing" in {
+      journeyState.set(State.Start, Nil)
+      val result = controller.doNothing(fakeRequest)
+      status(result) shouldBe 303
+      journeyState.get should have[State](State.Start, Nil)
+
+    }
+
+    "stay in Continue when doNothing" in {
+      journeyState.set(State.Continue("foo"), Nil)
+      val result = controller.doNothing(fakeRequest)
+      status(result) shouldBe 303
+      journeyState.get should have[State](State.Continue("foo"), Nil)
+    }
+
+    "stay in Stop when doNothing" in {
+      journeyState.set(State.Stop("baz"), Nil)
+      val result = controller.doNothing(fakeRequest)
+      status(result) shouldBe 303
+      journeyState.get should have[State](State.Stop("baz"), Nil)
+    }
+
     "given none when oldStart then redirect to Start" in {
       journeyState.clear
       val result = controller.oldStart(fakeRequest)

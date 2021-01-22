@@ -103,7 +103,7 @@ If needed, both *controller* and *service* can exercise fine control over the jo
 
 ### Where to start?
 
-You can use g8 template <https://github.com/hmrc/template-play-26-frontend-fsm.g8> as a start.
+You can start with g8 template available at <https://github.com/hmrc/template-play-27-frontend-fsm.g8>.
 
 ### How to add play-fsm library to your existing service?
 
@@ -192,7 +192,7 @@ Inside your `XYZController extends JourneyController[MyContext]` implement:
     val start = Transition {
         case State.Start        => goto(State.Start)
         case State.Continue(_)  => goto(State.Start)
-        case State.Stop(_)      => goto(State.Stop)
+        case State.Stop(_)      => stay
     }
 ```
 
@@ -202,6 +202,7 @@ Inside your `XYZController extends JourneyController[MyContext]` implement:
     def stop(user: User) = Transition {
         case Start              => goto(Stop(""))
         case Continue(value)    => goto(Stop(value))
+        case Stop()             => stay
     }
 ```
 

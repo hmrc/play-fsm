@@ -41,7 +41,7 @@ trait JourneyController[RequestContext] {
   val journeyService: JourneyService[RequestContext]
 
   import journeyService.{Breadcrumbs, StateAndBreadcrumbs}
-  import journeyService.model.{Merger, State, Transition, TransitionNotAllowed}
+  import journeyService.model.{Merger, State, StayInCurrentState, Transition, TransitionNotAllowed}
 
   //-------------------------------------------------
   // EXTENSION POINTS
@@ -196,9 +196,18 @@ trait JourneyController[RequestContext] {
       .apply(transition)
       .map(outcomeFactory)
       .map(_(request))
-      .recover {
+      .recoverWith {
         case TransitionNotAllowed(origin, breadcrumbs, _) =>
-          outcomeFactory((origin, breadcrumbs))(request) // renders current state back
+          Future.successful(
+            outcomeFactory((origin, breadcrumbs))(request)
+          )
+        case StayInCurrentState =>
+          journeyService.currentState.map {
+            case Some((state, breadcrumbs)) =>
+              outcomeFactory((state, breadcrumbs))(request)
+            case None =>
+              outcomeFactory((journeyService.model.root, Nil))(request)
+          }
       }
 
   /** Default fallback result is to redirect back to the Start state. */

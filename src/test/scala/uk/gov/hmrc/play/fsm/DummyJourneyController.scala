@@ -42,6 +42,10 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
 
   // ACTIONS
 
+  val doNothing: Action[AnyContent] =
+    actions
+      .apply(Transitions.doNothing)
+
   val oldStart: Action[AnyContent] = action { implicit request =>
     journeyService
       .cleanBreadcrumbs(_ => Nil)
