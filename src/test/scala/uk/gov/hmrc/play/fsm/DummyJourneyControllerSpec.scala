@@ -93,6 +93,29 @@ class DummyJourneyControllerSpec
       journeyState.get           should have[State](State.Start, Nil)
     }
 
+    "given none when showStart then redirect to Start" in {
+      journeyState.clear
+      val result = controller.showStart(fakeRequest)
+      status(result)           shouldBe 303
+      redirectLocation(result) shouldBe Some("/start")
+      journeyState.get           should have[State](State.Start, Nil)
+    }
+
+    "given none when showStartAndRunTask then redirect to Start" in {
+      journeyState.clear
+      val result = controller.showStartAndRunSuccessfulTask(fakeRequest)
+      status(result)           shouldBe 303
+      redirectLocation(result) shouldBe Some("/start")
+      journeyState.get           should have[State](State.Start, Nil)
+    }
+
+    "given none when showStartAndRunFailingTask then return fallback result" in {
+      journeyState.clear
+      val result = controller.showStartAndRunFailingTask(fakeRequest)
+      status(result) shouldBe 406
+      journeyState.get should have[State](State.Start, Nil)
+    }
+
     "given none when showStartOrRollback then redirect to Start" in {
       journeyState.clear
       val result = controller.showStartOrRollback(fakeRequest)
@@ -238,9 +261,69 @@ class DummyJourneyControllerSpec
       journeyState.get           should have[State](State.Continue("dummy"), List(State.Start))
     }
 
+    "given Start whenAuthorised0BindFormAndApplyTransitionContinue then redirect to Continue" in {
+      journeyState.set(State.Start, Nil)
+      val result = controller.whenAuthorised0BindFormAndApplyTransitionContinue(
+        fakeRequest.withFormUrlEncodedBody("arg" -> "dummy")
+      )
+      status(result)           shouldBe 303
+      redirectLocation(result) shouldBe Some("/continue")
+      journeyState.get           should have[State](State.Continue("dummy"), List(State.Start))
+    }
+
+    "given Start when getAsyncBindFormAndApplyTransitionContinue then redirect to Continue" in {
+      journeyState.set(State.Start, Nil)
+      val result = controller.getAsyncBindFormAndApplyTransitionContinue(
+        fakeRequest.withFormUrlEncodedBody("arg" -> "dummy")
+      )
+      status(result)           shouldBe 303
+      redirectLocation(result) shouldBe Some("/continue")
+      journeyState.get           should have[State](State.Continue("dummy"), List(State.Start))
+    }
+
+    "given Start when getAsyncGetAsyncBindFormAndApplyTransitionContinue then redirect to Continue" in {
+      journeyState.set(State.Start, Nil)
+      val result = controller.getAsyncGetAsyncBindFormAndApplyTransitionContinue(
+        fakeRequest.withFormUrlEncodedBody("arg" -> "dummy")
+      )
+      status(result)           shouldBe 303
+      redirectLocation(result) shouldBe Some("/continue")
+      journeyState.get           should have[State](State.Continue("dummy250"), List(State.Start))
+    }
+
+    "given Start whenAuthorised0GetAsyncBindFormAndApplyTransitionContinue then redirect to Continue" in {
+      journeyState.set(State.Start, Nil)
+      val result = controller.whenAuthorised0GetAsyncBindFormAndApplyTransitionContinue(
+        fakeRequest.withFormUrlEncodedBody("arg" -> "dummy")
+      )
+      status(result)           shouldBe 303
+      redirectLocation(result) shouldBe Some("/continue")
+      journeyState.get           should have[State](State.Continue("dummy"), List(State.Start))
+    }
+
+    "given Start whenAuthorisedGetAsyncBindFormAndApplyTransitionContinue then redirect to Continue" in {
+      journeyState.set(State.Start, Nil)
+      val result = controller.whenAuthorisedGetAsyncBindFormAndApplyTransitionContinue(
+        fakeRequest.withFormUrlEncodedBody("arg" -> "dummy")
+      )
+      status(result)           shouldBe 303
+      redirectLocation(result) shouldBe Some("/continue")
+      journeyState.get           should have[State](State.Continue("10"), List(State.Start))
+    }
+
     "given Start whenAuthorisedBindFormAndApplyTransitionContinue then redirect to Continue" in {
       journeyState.set(State.Start, Nil)
       val result = controller.whenAuthorisedBindFormAndApplyTransitionContinue(
+        fakeRequest.withFormUrlEncodedBody("arg" -> "dummy")
+      )
+      status(result)           shouldBe 303
+      redirectLocation(result) shouldBe Some("/continue")
+      journeyState.get           should have[State](State.Continue("dummy"), List(State.Start))
+    }
+
+    "given Start whenAuthorised0BindFormAndApplyWithRequestTransitionContinue then redirect to Continue" in {
+      journeyState.set(State.Start, Nil)
+      val result = controller.whenAuthorised0BindFormAndApplyWithRequestTransitionContinue(
         fakeRequest.withFormUrlEncodedBody("arg" -> "dummy")
       )
       status(result)           shouldBe 303

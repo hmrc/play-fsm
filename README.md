@@ -305,7 +305,7 @@ or
             .orApply(Transitions.start)
 ```
 
-- apply the transition to current state and redirect to the new state
+- apply the transition to the current state and redirect to the new state
 
 ```
     val stop: Action[AnyContent] = 
@@ -313,7 +313,7 @@ or
             .apply(Transitions.stop)
 ```
 
-- apply the transition to current state and redirect to the new state if has changed, otherwise re-display the state
+- apply the transition to the current state and redirect to the new state if has changed, otherwise re-display the state
 
 ```
     val stop: Action[AnyContent] = 
@@ -322,7 +322,7 @@ or
             .redirectOrDisplayIfSame
 ```
 
-- apply the transition to current state and display if new state is of expected type, otherwise redirect to the new state
+- apply the transition to the current state and display if new state is of expected type, otherwise redirect to the new state
 
 ```
     val stop: Action[AnyContent] =
@@ -359,6 +359,27 @@ or
             .parseJson[MyPayload]
             .apply(Transitions.processMyPayload)
             .recover { case _ => BadRequest }
+```
+
+- run some task after transition
+
+```
+    val runTask: Action[AnyContent] = 
+        actions
+            .parseJson[MyPayload]
+            .apply(Transitions.processMyPayload)
+            .recover { case _ => BadRequest }
+            .thenRunTask(_ => Future(println("Hello World!")))
+```
+
+- retrieve something before transition
+
+```
+    val runTask: Action[AnyContent] = 
+        actions
+            .getAsync(_ => Future.successful(1))
+            .bindForm(ArgForm)
+            .apply(Transitions.continue)
 ```
 
 - clear or refine the journey history after transition (cleanBreadcrumbs)
@@ -458,14 +479,8 @@ or
 
 ```
     val stop: Action[AnyContent] = actions
-        .whenAuthorised(asUser)
+        .whenAuthorisedWithRetrievals(asUser)
         .apply(Transitions.stop)
-```
-or
-```
-    val stop: Action[AnyContent] = action { implicit request =>
-        whenAuthorised(asUser)(Transitions.stop)(redirect)
-      }
 ```
 
 - render the current state when user has been authorized
@@ -473,16 +488,8 @@ or
 ```
     val showCurrent: Action[AnyContent] = 
         actions
-        .whenAuthorised(asUser)
+        .whenAuthorisedWithRetrievals(asUser)
         .showCurrentState
-```
-or
-```
-    val showCurrent: Action[AnyContent] = 
-        actions
-        .whenAuthorised(asUser)
-        .showCurrentState
-        .displayUsing(implicit request => renderState2)
 ```
 
 - display or redirect only when user has been authorized
@@ -490,8 +497,16 @@ or
 ```
     val stop: Action[AnyContent] = 
         actions
-            .whenAuthorised(asUser)
+            .whenAuthorisedWithRetrievals(asUser)
             .apply(Transitions.stop)
+            .redirectOrDisplayIfSame
+```
+or
+```
+    val stop: Action[AnyContent] = 
+        actions
+            .whenAuthorised(asUser)
+            .apply(Transitions.stop(0))
             .redirectOrDisplayIfSame
 ```
 
@@ -504,25 +519,28 @@ or
             .show[State.Continue]
             .orRollback
 ```
-or
-```
-    val showContinue: Action[AnyContent] = actionShowStateWhenAuthorised(asUser) {
-        case State.Continue(_) =>
-      }
-```
 
 -  for an authorized user only, render the current state if matches the pattern (type), otherwise apply the transition and redirect to the resulting state
 
 ```
     val showContinue: Action[AnyContent] = 
         actions
-            .whenAuthorised(asUser)
+            .whenAuthorisedWithRetrievals(asUser)
             .show[State.Continue]
             .orRollback
             .orApplyWithRequest(implicit request => Transitions.continue)
 ```
+or
+```
+    val showContinue: Action[AnyContent] = 
+        actions
+            .whenAuthorised(asUser)
+            .show[State.Continue]
+            .orRollback
+            .orApplyWithRequest(implicit request => Transitions.continue(0))
+```
 
-- for an authorized user only, apply the transition to current state and redirect to the resulting state
+- for an authorized user only, render the current state if matches the pattern (type), otherwise rollback using merger
 
 ```
     val showContinue: Action[AnyContent] = 
@@ -530,5 +548,23 @@ or
             .whenAuthorised(asUser)
             .show[State.Continue]
             .orRollbackUsing(Mergers.toContinue)
+```
+
+- for an authorized user only, retrieve additional information, then apply the transition to the current state and redirect to the resulting state
+
+```
+    val showContinue: Action[AnyContent] = 
+        actions
+            .whenAuthorised(asUser)
+            .getAsync(_ => Future.successful(1))
+            .apply(i => Transitions.stop(i))
+```
+or
+```
+    val showContinue: Action[AnyContent] = 
+        actions
+            .whenAuthorisedWithRetrievals(asUser)
+            .getAsync(_ => Future.successful(1))
+            .apply(a => b => Transitions.stop(a+b))
 ```
 
