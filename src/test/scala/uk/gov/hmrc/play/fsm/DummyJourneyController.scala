@@ -32,7 +32,7 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
     with JourneyController[DummyContext] {
 
   import DummyJourneyController._
-  import journeyService.model.{Mergers, State, Transitions}
+  import journeyService.model.{Mergers, State, Transition, Transitions}
 
   override implicit def context(implicit rh: RequestHeader): DummyContext = DummyContext()
 
@@ -55,6 +55,20 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
   val oldShowStart: Action[AnyContent] = actionShowState {
     case State.Start =>
   }
+
+  val showStart: Action[AnyContent] =
+    actions
+      .show[State.Start.type]
+
+  val showStartAndRunSuccessfulTask: Action[AnyContent] =
+    actions
+      .show[State.Start.type]
+      .thenRunTask(_ => Future(println("Hello World!")))
+
+  val showStartAndRunFailingTask: Action[AnyContent] =
+    actions
+      .show[State.Start.type]
+      .thenRunTask(_ => Future.failed(new Exception), Some(NotAcceptable))
 
   val showStartOrRollback: Action[AnyContent] =
     actions
@@ -108,34 +122,73 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
       .bindFormDerivedFromState(_ => ArgForm)
       .applyWithRequest(_ => Transitions.continue(1))
 
-  def whenAuthorisedBindFormAndApplyTransitionContinue: Action[AnyContent] =
+  def whenAuthorised0BindFormAndApplyTransitionContinue: Action[AnyContent] =
     actions
       .whenAuthorised(asUser)
+      .bindForm(ArgForm)
+      .apply(Transitions.continue(0))
+
+  def getAsyncBindFormAndApplyTransitionContinue: Action[AnyContent] =
+    actions
+      .getAsync(_ => Future.successful(1))
       .bindForm(ArgForm)
       .apply(Transitions.continue)
 
-  def whenAuthorisedBindFormAndApplyWithRequestTransitionContinue: Action[AnyContent] =
+  def getAsyncGetAsyncBindFormAndApplyTransitionContinue: Action[AnyContent] =
+    actions
+      .getAsync(_ => Future.successful(5))
+      .getAsync(_ => i => Future.successful(i * 10))
+      .bindForm(ArgForm)
+      .apply(a => b => c => Transitions.continue(a)(c + (a * b)))
+
+  def whenAuthorised0GetAsyncBindFormAndApplyTransitionContinue: Action[AnyContent] =
+    actions
+      .whenAuthorised(asUser)
+      .getAsync(_ => Future.successful(1))
+      .bindForm(ArgForm)
+      .apply(Transitions.continue)
+
+  def whenAuthorisedBindFormAndApplyTransitionContinue: Action[AnyContent] =
+    actions
+      .whenAuthorisedWithRetrievals(asUser)
+      .bindForm(ArgForm)
+      .apply(Transitions.continue)
+
+  def whenAuthorised0BindFormAndApplyWithRequestTransitionContinue: Action[AnyContent] =
     actions
       .whenAuthorised(asUser)
       .bindForm(ArgForm)
+      .applyWithRequest(_ => Transitions.continue(0))
+
+  def whenAuthorisedBindFormAndApplyWithRequestTransitionContinue: Action[AnyContent] =
+    actions
+      .whenAuthorisedWithRetrievals(asUser)
+      .bindForm(ArgForm)
       .applyWithRequest(_ => Transitions.continue)
+
+  def whenAuthorisedGetAsyncBindFormAndApplyTransitionContinue: Action[AnyContent] =
+    actions
+      .whenAuthorisedWithRetrievals(asUser)
+      .getAsync(_ => i => Future.successful(i * 2))
+      .bindForm(ArgForm)
+      .apply(a => b => _ => Transitions.continue(a)(b.toString))
 
   def whenAuthorisedBindFormDerivedFromStateAndApplyTransitionContinue: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .bindFormDerivedFromState(_ => ArgForm)
       .apply(Transitions.continue)
 
   def whenAuthorisedBindFormDerivedFromStateAndApplyWithRequestTransitionContinue
     : Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .bindFormDerivedFromState(_ => ArgForm)
       .applyWithRequest(_ => Transitions.continue)
 
   def continueDsl2: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .bindForm(ArgForm)
       .applyWithRequest(_ => Transitions.continue)
 
@@ -145,64 +198,64 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
 
   val whenAuthorisedShowContinueOrRollback: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .show[State.Continue]
       .orRollback
 
   val whenAuthorisedShowContinueOrRollbackUsing: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .show[State.Continue]
       .orRollbackUsing(Mergers.toContinue)
 
   val whenAuthorisedShowContinueOrRollbackOrApplyTransitionShowContinue: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .show[State.Continue]
       .orRollback
       .orApply(Transitions.showContinue)
 
   val whenAuthorisedShowContinueOrApplyShowContinue: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .show[State.Continue]
       .orApply(Transitions.showContinue)
 
   val whenAuthorisedShowContinueOrRollbackOrApplyWithRequestTransitionShowContinue
     : Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .show[State.Continue]
       .orRollback
       .orApplyWithRequest(implicit request => Transitions.showContinue)
 
   val whenAuthorisedShowContinueOrApplyWithRequestTransitionShowContinue: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .show[State.Continue]
       .orApplyWithRequest(implicit request => Transitions.showContinue)
 
   val whenAuthorisedShowContinueOrRedirectToCurrentState: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .show[State.Continue]
       .orRedirectToCurrentState
 
   val whenAuthorisedShowContinueOrRedirectToStart: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .show[State.Continue]
       .orRedirectToStart
 
   val whenAuthorisedShowContinueOrReturn: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .show[State.Continue]
       .orReturn(NotAcceptable)
 
   val whenAuthorisedShowContinueOrRedirectTo: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .show[State.Continue]
       .orRedirectTo(Call("GET", "/dummy"))
 
@@ -212,17 +265,17 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
 
   val whenAuthorisedApplyTransitionStop: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .apply(Transitions.stop)
 
   val whenAuthorisedApplyWithRequestTransitionStop: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .applyWithRequest(_ => Transitions.stop)
 
   val whenAuthorisedApplyTransitionStopRedirectOrDisplayIfSame: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .apply(Transitions.stop)
       .redirectOrDisplayIfSame
 
@@ -233,7 +286,7 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
 
   val stopDsl5: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .applyWithRequest(_ => Transitions.stop)
       .redirectOrDisplayIfSame
 
@@ -244,7 +297,7 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
 
   val stopDsl7: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .apply(Transitions.stop)
       .redirectOrDisplayIf[State.Stop]
 
@@ -255,7 +308,7 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
 
   val stopDsl9: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .applyWithRequest(_ => Transitions.stop)
       .redirectOrDisplayIf[State.Stop]
 
@@ -266,7 +319,7 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
 
   val stopDsl11: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .apply(Transitions.stop)
       .redirectOrDisplayIf[State.Continue]
 
@@ -277,7 +330,7 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
 
   val stopDsl13: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .applyWithRequest(_ => Transitions.stop)
       .redirectOrDisplayIf[State.Continue]
 
@@ -292,12 +345,12 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
 
   val showStopDsl: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .show[State.Stop]
 
   val showStopDsl2: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .show[State.Stop]
       .andCleanBreadcrumbs()
 
@@ -319,41 +372,41 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
 
   val showDeadEndDsl2: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .show[State.DeadEnd]
       .orRollbackUsing(Mergers.toDeadEnd)
       .orApplyWithRequest(implicit request => user => Transitions.toDeadEnd(dummyFx))
 
   val showDeadEndDsl4: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .show[State.DeadEnd]
       .orRollbackUsing(Mergers.toDeadEnd)
       .orApply(user => Transitions.toDeadEnd(dummyFx2))
 
   val showDeadEndDsl3: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .show[State.DeadEnd]
       .orRollbackUsing(Mergers.toDeadEnd)
 
   val parseJson1: Action[AnyContent] =
     actions
-      .parseJson[TestPayload]
+      .parseJson[TestPayload]()
       .apply(Transitions.processPayload)
       .recoverWith(implicit request => { case _ => Future.successful(BadRequest) })
 
   val parseJson2: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
-      .parseJson[TestPayload](ifFailure = _ => Future.successful(BadRequest))
+      .whenAuthorisedWithRetrievals(asUser)
+      .parseJson[TestPayload](optionalIfFailure = Some(BadRequest))
       .apply(user => Transitions.processPayload)
       .recover { case _ => BadRequest }
 
   val parseJson3: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
-      .parseJson[TestPayload](ifFailure = _ => Future.successful(BadRequest))
+      .whenAuthorisedWithRetrievals(asUser)
+      .parseJson[TestPayload](optionalIfFailure = Some(BadRequest))
       .apply(user => Transitions.processPayload)
       .displayUsing(implicit request => renderState2)
       .recover { case _ => BadRequest }
@@ -361,53 +414,53 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
 
   val wait1: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .waitForStateAndDisplay[State.Continue](3)
 
   val wait1_1: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .waitForStateAndDisplayUsing[State.Continue](3, implicit request => renderState2)
 
   val wait2: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .waitForStateAndDisplay[State.Continue](3)
       .recover { case e: TimeoutException => BadRequest }
 
   val wait3: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .waitForStateAndDisplay[State.Continue](3)
       .orApplyOnTimeout(_ => Transitions.showContinue)
 
   val wait4: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .waitForStateThenRedirect[State.Continue](3)
 
   val wait5: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .waitForStateThenRedirect[State.Continue](3)
       .recover { case e: TimeoutException => BadRequest }
 
   val wait6: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .waitForStateThenRedirect[State.Continue](3)
       .orApplyOnTimeout(_ => Transitions.showContinue)
 
   val wait7: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .waitForStateThenRedirect[State.Continue](3)
       .orApplyOnTimeout(_ => Transitions.showContinue)
       .display
 
   val wait8: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .waitForStateThenRedirect[State.Continue](3)
       .orApplyOnTimeout(_ => Transitions.showContinue)
       .redirectOrDisplayIf[State.Continue]
@@ -465,12 +518,12 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
 
   val current3: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .showCurrentState
 
   val current4: Action[AnyContent] =
     actions
-      .whenAuthorised(asUser)
+      .whenAuthorisedWithRetrievals(asUser)
       .showCurrentState
       .displayUsing(implicit request => renderState2)
 
