@@ -392,21 +392,21 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
 
   val parseJson1: Action[AnyContent] =
     actions
-      .parseJson[TestPayload]()
+      .parseJson[TestPayload]
       .apply(Transitions.processPayload)
       .recoverWith(implicit request => { case _ => Future.successful(BadRequest) })
 
   val parseJson2: Action[AnyContent] =
     actions
       .whenAuthorisedWithRetrievals(asUser)
-      .parseJson[TestPayload](optionalIfFailure = Some(BadRequest))
+      .parseJsonWithFallback[TestPayload](ifFailure = BadRequest)
       .apply(user => Transitions.processPayload)
       .recover { case _ => BadRequest }
 
   val parseJson3: Action[AnyContent] =
     actions
       .whenAuthorisedWithRetrievals(asUser)
-      .parseJson[TestPayload](optionalIfFailure = Some(BadRequest))
+      .parseJsonWithFallback[TestPayload](ifFailure = BadRequest)
       .apply(user => Transitions.processPayload)
       .displayUsing(implicit request => renderState2)
       .recover { case _ => BadRequest }
@@ -432,7 +432,13 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
     actions
       .whenAuthorisedWithRetrievals(asUser)
       .waitForStateAndDisplay[State.Continue](3)
-      .orApplyOnTimeout(_ => Transitions.showContinue)
+      .orApplyOnTimeout(Transitions.showContinue)
+
+  val wait3_1: Action[AnyContent] =
+    actions
+      .whenAuthorisedWithRetrievals(asUser)
+      .waitForStateAndDisplay[State.Continue](3)
+      .orApplyWithRequestOnTimeout(implicit request => Transitions.showContinue)
 
   val wait4: Action[AnyContent] =
     actions
@@ -449,20 +455,20 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
     actions
       .whenAuthorisedWithRetrievals(asUser)
       .waitForStateThenRedirect[State.Continue](3)
-      .orApplyOnTimeout(_ => Transitions.showContinue)
+      .orApplyOnTimeout(Transitions.showContinue)
 
   val wait7: Action[AnyContent] =
     actions
       .whenAuthorisedWithRetrievals(asUser)
       .waitForStateThenRedirect[State.Continue](3)
-      .orApplyOnTimeout(_ => Transitions.showContinue)
+      .orApplyOnTimeout(Transitions.showContinue)
       .display
 
   val wait8: Action[AnyContent] =
     actions
       .whenAuthorisedWithRetrievals(asUser)
       .waitForStateThenRedirect[State.Continue](3)
-      .orApplyOnTimeout(_ => Transitions.showContinue)
+      .orApplyOnTimeout(Transitions.showContinue)
       .redirectOrDisplayIf[State.Continue]
 
   val wait11: Action[AnyContent] =
@@ -481,7 +487,7 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
   val wait13: Action[AnyContent] =
     actions
       .waitForStateAndDisplay[State.Continue](3)
-      .orApplyOnTimeout(_ => Transitions.showContinue(555))
+      .orApplyOnTimeout(Transitions.showContinue(555))
 
   val wait14: Action[AnyContent] =
     actions
@@ -495,18 +501,18 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
   val wait16: Action[AnyContent] =
     actions
       .waitForStateThenRedirect[State.Continue](3)
-      .orApplyOnTimeout(_ => Transitions.showContinue(555))
+      .orApplyOnTimeout(Transitions.showContinue(555))
 
   val wait17: Action[AnyContent] =
     actions
       .waitForStateThenRedirect[State.Continue](3)
-      .orApplyOnTimeout(_ => Transitions.showContinue(555))
+      .orApplyOnTimeout(Transitions.showContinue(555))
       .display
 
   val wait18: Action[AnyContent] =
     actions
       .waitForStateThenRedirect[State.Continue](3)
-      .orApplyOnTimeout(_ => Transitions.showContinue(555))
+      .orApplyOnTimeout(Transitions.showContinue(555))
       .redirectOrDisplayIf[State.Continue]
 
   val current1: Action[AnyContent] =

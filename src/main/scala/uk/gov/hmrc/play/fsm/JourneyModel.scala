@@ -17,6 +17,7 @@
 package uk.gov.hmrc.play.fsm
 
 import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
 
 /**
   * Journey Model is a base trait of a Finite State Machine,
@@ -42,11 +43,18 @@ trait JourneyModel {
   final class Transition private (val apply: PartialFunction[State, Future[State]]) {
 
     /**
-      * Composes this transition with a fallback transition
+      * Composes this transition with the fallback transition
       * which gets applied where this transition is not defined for the curent state.
       */
-    def orElse(other: Transition): Transition =
-      Transition(apply.orElse(other.apply))
+    def orElse(fallback: Transition): Transition =
+      Transition(apply.orElse(fallback.apply))
+
+    /**
+      * Composes this transition with the next transition
+      * which gets applied to the result of this transition, if successful.
+      */
+    def andThen(next: Transition): Transition =
+      Transition(apply.andThen(_.flatMap(state => next.apply(state))))
   }
 
   /** Transition builder helper */
