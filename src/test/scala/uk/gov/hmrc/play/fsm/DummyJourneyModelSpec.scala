@@ -19,6 +19,7 @@ import DummyJourneyModel.{Merger, Mergers, State, Transition, TransitionNotAllow
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.reflect.ClassTag
+import scala.util.Try
 
 class DummyJourneyModelSpec extends UnitSpec with StateMatchers[State] {
 
@@ -41,6 +42,9 @@ class DummyJourneyModelSpec extends UnitSpec with StateMatchers[State] {
     def when(transition: Transition): (State, List[State]) =
       await(super.apply(transition).recover { case TransitionNotAllowed(s, b, _) => (s, b) })
 
+    def shouldFailWhen(transition: Transition) =
+      Try(await(super.apply(transition))).isSuccess shouldBe false
+
     def when(merger: Merger[S], state: State): (State, List[State]) =
       await(super.modify { s: S => merger.apply((s, state)) })
   }
@@ -55,6 +59,18 @@ class DummyJourneyModelSpec extends UnitSpec with StateMatchers[State] {
       }
       "go to the Continue state after `stop` transition" in {
         given(null) when Transitions.stop(5) should thenGo(State.Stop(""))
+      }
+      "go to the Continue state after `start then continue` transition" in {
+        given(null) when Transitions.start.andThen(Transitions.continue(0)("baz")) should thenGo(
+          State.Continue("baz")
+        )
+      }
+      "go to the Stop state after `start then continue then stop` transition" in {
+        given(null) when Transitions.start
+          .andThen(Transitions.continue(0)("baz"))
+          .andThen(Transitions.stop(0)) should thenGo(
+          State.Stop("baz")
+        )
       }
     }
 
@@ -90,6 +106,14 @@ class DummyJourneyModelSpec extends UnitSpec with StateMatchers[State] {
         given(State.Continue("dummy")) when (Mergers.toContinue, State.Stop("dummy")) should thenGo(
           State.Continue("dummy_dummy")
         )
+      }
+      "go to the Continue state after `start or continue` transition" in {
+        given(State.Start) when Transitions
+          .continue(0)("bar")
+          .orElse(
+            Transitions
+              .stop(1)
+          ) should thenGo(State.Continue("bar"))
       }
     }
 

@@ -1,42 +1,78 @@
 ![GitHub release (latest by date)](https://img.shields.io/github/v/release/hmrc/play-fsm) ![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/hmrc/play-fsm)
 
-# play-fsm
-This library provides building blocks for a stateful Play Framework application.
+play-fsm
+===
 
-## Table of contents
+A pattern for building stateful microservices using Scala and Play Framework
+===
 
-* [About](#about)
-    * [Advanced examples](#advanced-examples)
-* [How-tos](#how-tos)
-* [Patterns](#patterns)
-    * [Model](#model-patterns)
-    * [Controller](#controller-patterns)
-    * [Service](#service-patterns)
-    * [Authorization](#authorization-patterns)
+Problem definition
+---
 
-## About
-    
-### Motivation
-Implementing user journey through the stateful business process while preserving integrity and consistency of a data at each stage is a challenge. 
-It is even more of a challenge in a traditional server-oriented web application built on top of a stateless-by-design HTTP protocol.
+Service is stateful when the user to complete a task or transaction has to pursue several steps in the prescribed order. We call it a journey or a user flow. Each service can host multiple such journeys, isolated or interconnected. The journey might be visually represented as a diagram of steps connected by possible paths.
 
-Common requirements are:
-- the application has to accumulate business transaction input based on multiple prior interactions with the user
-- depending on the user selections and decisions various business outcomes are possible (including final lack of action)
-- only a few possible journey paths are permitted, the application has to validate each time what user can do given the current state
-- the application must be able to acquire, cache and show additional data sourced asynchronously from upstream services
-- user must be able to go back and change her input before final transaction will take place
-- out-of-order and rogue request handling, introducing malformed state leading to invalid business transaction has to be prevented
-- the testability of an application must not be compromised by the intrinsic implementation complexities
+Service job is to both assist the user through the journey and protect transaction integrity. This task is particularly challenging when built on top of a stateless HTTP protocol when there is no firm guarantee about incoming requests' order and content. Neither common mistake nor a bookmarked link nor malicious post should force the service to the unexpected and potentially harmful state. 
 
-### Solution
-Finite State Machine is an established pattern to model any non-trivial business process flow using states and transitions. 
+Solution outline
+---
 
-See <https://brilliant.org/wiki/finite-state-machines/>.
+- For each journey know what the steps are and what is the expected order,
+- Understand the minimal and necessary set of data required at each stage,
+- Have a clear and unambiguous definition of the above,
+- Track user's progress throughout the journey,
+- Detect and block unauthorised actions.
 
-In this library, you will find a ready-to-use solution tailored for use in an HMRC-style frontend Play application. 
+FSM approach
+---
 
-### Design
+Looking at the problem, it becomes clear we can easily model any user flow using a finite state machine. Steps are states. Transitions represent paths. Each state holds some data set. Each transition can bring new user input or call external APIs. All steps and transitions must form a single connected graph.
+
+Common pain points
+---
+
+- Core business logic heavily coupled with framework and protocol implementation details,
+- User flow logic partitioned and scattered throughout layers and components,
+- Loosely modelled flow state, informally derived ad-hoc from the user input, model flags, etc.,
+- User flow orchestrated solely by the UI layer, based on the visibility of links and forms to the user,
+- Partial, random and inconsistent verification of the flow order and data integrity,
+- Slow and complicated integration tests, no easy way to test specific steps in isolation.
+
+
+How play-fsm helps?
+---
+
+Play-FSM brings a pattern, `an order and method`, for stateful service implementation, with the following properties:
+
+- User flow logic is decoupled from framework and protocol details,
+- User flow logic is defined explicitly and in a single place,
+- Service layer knows the current state of the journey of every user,
+- Transition is the only way to change the current state,
+- Controller layer maps HTTP endpoints to transitions,
+- Controller layer maps states to the UI views for rendering,
+- Controller layer maps states to HTTP endpoints for redirections.
+
+What is in the play-fsm box?
+---
+
+User flow (journey) model is written as a simple and static Scala code, consisting of:
+- States, represented by case object or case classes
+- Transitions, represented by pure functions of type `Transition => Future[Transition]`
+
+Library provides specialized traits for implementing service and controller components.
+
+Rich Actions DSL offers a wide variety of ready-to-use mappings between endpoints and transitions.
+
+Benefits of using play-fsm
+---
+
+- User flow logic is visible and easy to reason about,
+- Overall service behaviour is consistent and predictable,
+- Adding new or modifying existing features with confidence is super-fast,
+- Lightweight nature of journey model makes it perfect for extensive and fast unit testing,
+- Decoupled state management makes isolated integration tests both more straightforward and faster.
+
+API details
+---
 The key concept is a **Journey**.
 Each journey represents separate business process/transaction.
 Each journey has a single root state.
@@ -61,14 +97,8 @@ Breadcrumbs allow for safe back-linking and rolling history back.
 
 If needed, both *controller* and *service* can exercise fine control over the journey history.
 
-### Benefits
-- proper concern separation: 
-    - *model* defines core and *pure* business logic decoupled from the application implementation details,
-    - *controller* is responsible for wiring user interactions (HTTP requests and responses, HTML forms and pages) into the model transitions,
-    - *service* acts as glue between controller and model, taking care of state persistence and breadcrumbs management.
-- lightweight, complete and fast testing of a core journey model without spanning a Play application or an HTTP server.
-
-### Features
+Mixins
+---
 - `JourneyModel` state and transition model
 - `JourneyService` basic state and breadcrumbs services
 - `PersistentJourneyService` persistence plug-in
@@ -76,7 +106,8 @@ If needed, both *controller* and *service* can exercise fine control over the jo
 - `JsonStateFormats` state to json serialization and deserialization builder
 - `JourneyIdSupport` mix into JourneyController to feature unique journeyId in the Play session
 
-### Advanced examples:
+Advanced examples:
+---
 - Agent Invitations: 
     - Models: <https://github.com/hmrc/agent-invitations-frontend/tree/master/app/uk/gov/hmrc/agentinvitationsfrontend/journeys>
     - Controllers: <https://github.com/hmrc/agent-invitations-frontend/blob/master/app/uk/gov/hmrc/agentinvitationsfrontend/controllers>
@@ -89,7 +120,8 @@ If needed, both *controller* and *service* can exercise fine control over the jo
     - Models: https://github.com/hmrc/trader-services-route-one-frontend/tree/master/app/uk/gov/hmrc/traderservices/journeys
     - Controllers: <https://github.com/hmrc/trader-services-route-one-frontend/tree/master/app/uk/gov/hmrc/traderservices/controllers>
 
-### Best practices
+Best practices
+---
 - Keep a single model definition in a single file.
 - Name states as nouns and transitions as verbs.
 - Carefully balance when to introduce new state and when to add properties to the existing one(s).
@@ -99,46 +131,56 @@ If needed, both *controller* and *service* can exercise fine control over the jo
 - Define transitions using curried methods. It works well with action builders.
 - When the transition depends on some external operation(s), pass it as a function(s).
 
-## How-tos
+How-tos
+===
 
-### Where to start?
+Where to start?
+---
 
 You can start with g8 template available at <https://github.com/hmrc/template-play-27-frontend-fsm.g8>.
 
-### How to add play-fsm library to your existing service?
+How to add play-fsm library to your existing service?
+---
 
 In your SBT build add:
 
     resolvers += Resolver.bintrayRepo("hmrc", "releases")
     
-    libraryDependencies += "uk.gov.hmrc" %% "play-fsm" % "0.x.0-play-25"
+    libraryDependencies += "uk.gov.hmrc" %% "play-fsm" % "0.x.0-play-27"
     
 or 
     
     libraryDependencies += "uk.gov.hmrc" %% "play-fsm" % "0.x.0-play-26"
     
-### How to build a model?
+How to build a model?
+---
+
 - First, try to visualise user interacting with your application in any possible way. 
 - Think about translating pages and forms into a diagram of states and transitions.
 - Notice the required inputs and knowledge accumulated at each user journey stage.
 - Create a new model object and define there the rules of the game, see an example in <https://github.com/hmrc/play-fsm/blob/master/src/test/scala/uk/gov/hmrc/play/fsm/DummyJourneyModel.scala>.
 - Create a unit test to validate all possible states and transitions outcomes, see an example in <https://github.com/hmrc/play-fsm/blob/master/src/test/scala/uk/gov/hmrc/play/fsm/DummyJourneyModelSpec.scala>.
 
-### How to persist in the state?
+How to persist in the state?
+---
+
 - play-fsm is not opinionated about state persistence and session management choice but provides an abstract API in the `PersistentJourneyService`.
 - `JsonStateFormats` helps to encode/decode state to JSON when using MongoDB or an external REST service, e.g. <https://github.com/hmrc/play-fsm/blob/master/src/test/scala/uk/gov/hmrc/play/fsm/DummyJourneyStateFormats.scala>.
 
-### How to define a controller?
+How to define a controller?
+---
+
 - Create a controller as usual extending `JourneyController` trait.
 - Decide 2 things:
-    - How to wire action calls into model transitions, use provided action helpers selection, see <https://github.com/hmrc/play-fsm/blob/master/src/test/scala/uk/gov/hmrc/play/fsm/DummyJourneyController.scala>.
-    - How to display the state after GET call, implement `renderState`
+    - How to wire action calls into model transitions? Use provided Actions DSL helpers selection, see <https://github.com/hmrc/play-fsm/blob/master/src/test/scala/uk/gov/hmrc/play/fsm/DummyJourneyController.scala>.
+    - How to display the state after GET call? Implement `renderState`.
 - Map all GET calls to states, implement `getCallFor` method
-- Use `backlinkFor` or `backlinkToMostRecent[S]` method to get back link call given breadcrumbs
+- Consider using `backlinkFor` or `backlinkToMostRecent[S]` method to get back link call given breadcrumbs
 - GET actions should be idempotent, i.e. should only render existing or historical state.
-- POST actions should always invoke some state transition and be followed be a redirect.
+- POST actions should always invoke some state transition and be followed by a redirect.
 
-### What is RequestContext type parameter?
+What is RequestContext type parameter?
+---
 The type parameter `[RequestContext]` is the type of an implicit context information expected to be
 available throughout every action body and in the bottom layers (i.e. persistence, connectors). 
 In the HMRC case it is a `HeaderCarrier`.
@@ -147,9 +189,11 @@ Inside your `XYZController extends JourneyController[MyContext]` implement:
 
     override implicit def context(implicit rh: RequestHeader): MyContext = MyContext(...)
 
-## Patterns
+Patterns
+===
 
-### Model patterns
+Model patterns
+---
 
 #### State definition patterns
 
@@ -360,6 +404,13 @@ or
             .apply(Transitions.processMyPayload)
             .recover { case _ => BadRequest }
 ```
+or
+```
+    val processJson: Action[AnyContent] = 
+        actions
+            .parseJsonWithFallback[MyPayload](BadRequest)
+            .apply(Transitions.processMyPayload)
+```
 
 - run some task after transition
 
@@ -446,7 +497,8 @@ or
             with JourneyIdSupport[MyContext] {
 ```
 
-### Service patterns
+Service patterns
+---
 
 - do not keep error states in the journey history (breadcrumbs)
 
@@ -462,7 +514,8 @@ or
         _.take(1)
 ```
 
-### Authorization patterns
+Authorization patterns
+---
 
 - wrap your own authorisation logic returning some `User` entity
 

@@ -1382,13 +1382,20 @@ trait JourneyController[RequestContext] {
     /**
       * Parse the JSON body of the request.
       * If valid, apply the following transition,
+      * if not valid, throw an exception.
+      * @tparam Entity entity
+      */
+    final def parseJson[Entity: Reads]: ParseJson[Entity] =
+      new ParseJson[Entity](None)
+
+    /**
+      * Parse the JSON body of the request.
+      * If valid, apply the following transition,
       * if not valid, return the alternative result.
       * @tparam Entity entity
       */
-    final def parseJson[Entity: Reads](
-      optionalIfFailure: Option[Result] = None
-    ): ParseJson[Entity] =
-      new ParseJson[Entity](optionalIfFailure)
+    final def parseJsonWithFallback[Entity: Reads](ifFailure: Result): ParseJson[Entity] =
+      new ParseJson[Entity](Some(ifFailure))
 
     final class ParseJson[Entity: Reads] private[fsm] (
       optionalIfFailure: Option[Result]
@@ -1494,14 +1501,45 @@ trait JourneyController[RequestContext] {
 
       /**
         * Wait until the state becomes of S type,
-        * or if timeout expires apply the transition and redirect to the new state.
+        * or when timeout expires apply the transition and redirect to the new state.
         *
         * @note follow with [[display]] or [[redirectOrDisplayIf]] to display instead of redirecting.
         */
-      final def orApplyOnTimeout(transition: TransitionWithRequest): OrApply =
+      final def orApplyOnTimeout(transition: Transition): OrApply =
         new OrApply(transition)
 
-      final class OrApply private[fsm] (transition: TransitionWithRequest) extends Executable {
+      final class OrApply private[fsm] (transition: Transition) extends Executable {
+        override def execute(
+          settings: Settings
+        )(implicit
+          request: Request[_],
+          ec: ExecutionContext
+        ): Future[Result] =
+          wrap { resolve =>
+            waitForUsing(
+              { implicit request =>
+                implicit val rc: RequestContext = JourneyController.this.context(request)
+                JourneyController.this.apply(
+                  resolve(transition),
+                  settings.outcomeFactoryOpt.getOrElse(JourneyController.this.redirect)
+                )
+              },
+              outcomeFactory
+            )
+          }
+      }
+
+      /**
+        * Wait until the state becomes of S type,
+        * or when timeout expires apply the transition and redirect to the new state.
+        *
+        * @note follow with [[display]] or [[redirectOrDisplayIf]] to display instead of redirecting.
+        */
+      final def orApplyWithRequestOnTimeout(transition: TransitionWithRequest): OrApplyWithRequest =
+        new OrApplyWithRequest(transition)
+
+      final class OrApplyWithRequest private[fsm] (transition: TransitionWithRequest)
+          extends Executable {
         override def execute(
           settings: Settings
         )(implicit
