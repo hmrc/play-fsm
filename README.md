@@ -3,45 +3,48 @@
 play-fsm
 ===
 
-A pattern for building stateful microservices using Scala and Play Framework
+A pattern for stateful microservices using Scala and Play Framework
 ===
 
-Problem definition
+What `stateful` means?
 ---
 
-Service is stateful when the user to complete a task or transaction has to pursue several steps in the prescribed order. We call it a journey or a user flow. Each service can host multiple such journeys, isolated or interconnected. The journey might be visually represented as a diagram of steps connected by possible paths.
+Previous user interactions dictate the current behaviour of the service.
 
-Service job is to both assist the user through the journey and protect transaction integrity. This task is particularly challenging when built on top of a stateless HTTP protocol when there is no firm guarantee about incoming requests' order and content. Neither common mistake nor a bookmarked link nor malicious post should force the service to the unexpected and potentially harmful state. 
+The user to complete a process has to provide information in multiple stages in the expected order.
 
-Solution outline
+Think multi-page tax form, shopping cart or financial transaction.
+
+Objectives of stateful microservice
 ---
 
-- For each journey know what the steps are and what is the expected order,
-- Understand the minimal and necessary set of data required at each stage,
-- Have a clear and unambiguous definition of the above,
-- Track user's progress throughout the journey,
-- Detect and block unauthorised actions.
+- Keep track of user steps and provided information
+- Offer user the right directions at each stage
+- Accept only expected actions and inputs
+- Protect the integrity of collected data
+- Conclude process only if all requirements met
+
+Common implementation pitfals
+---
+
+- Technical solution details overshadow and hinder business process logic,
+- Process state derived informally from the collected input,
+- Loose set of scattered helper methods decide the process rules,
+- New features can surpass existing checks, intentionally or by mistake,
+- Process orchestrated and validated mainly on the UI level,
+- Inconsistent application of process rules on different layers,
+- Unforeseen user interactions lead to process corruption,
+- Testing features in isolation requires complex and slow process warming.
 
 FSM approach
 ---
 
-Looking at the problem, it becomes clear we can easily model any user flow using a finite state machine. Steps are states. Transitions represent paths. Each state holds some data set. Each transition can bring new user input or call external APIs. All steps and transitions must form a single connected graph.
+Looking at the objectives, it becomes apparent we can model our requirements using a finite state machine concept. Process steps are states, and transitions represent user actions. Each state holds only the necessary information, and each transition can bring new user input or call external services. All steps and transitions form a single connected graph.
 
-Common pain points
+How `play-fsm` helps?
 ---
 
-- Core business logic heavily coupled with framework and protocol implementation details,
-- User flow logic partitioned and scattered throughout layers and components,
-- Loosely modelled flow state, informally derived ad-hoc from the user input, model flags, etc.,
-- User flow orchestrated solely by the UI layer, based on the visibility of links and forms to the user,
-- Partial, random and inconsistent verification of the flow order and data integrity,
-- Slow and complicated integration tests, no easy way to test specific steps in isolation.
-
-
-How play-fsm helps?
----
-
-Play-FSM brings a pattern, `an order and method`, for stateful service implementation, with the following properties:
+Play-FSM brings a pattern, `an order and method`, for stateful microservice implementation, with the following properties:
 
 - User flow logic is decoupled from framework and protocol details,
 - User flow logic is defined explicitly and in a single place,
@@ -51,7 +54,7 @@ Play-FSM brings a pattern, `an order and method`, for stateful service implement
 - Controller layer maps states to the UI views for rendering,
 - Controller layer maps states to HTTP endpoints for redirections.
 
-What is in the play-fsm box?
+What is in the `play-fsm` box?
 ---
 
 User flow (journey) model is written as a simple and static Scala code, consisting of:
@@ -62,7 +65,7 @@ Library provides specialized traits for implementing service and controller comp
 
 Rich Actions DSL offers a wide variety of ready-to-use mappings between endpoints and transitions.
 
-Benefits of using play-fsm
+Benefits of using `play-fsm`
 ---
 
 - User flow logic is visible and easy to reason about,
