@@ -57,11 +57,11 @@ Play-FSM brings a pattern, `an order and method`, for stateful microservice impl
 What is in the `play-fsm` box?
 ---
 
-User flow (journey) model is written as a simple and static Scala code, consisting of:
-- States, represented by case object or case classes
-- Transitions, represented by pure functions of type `Transition => Future[Transition]`
+User flow (journey) model is written as a plain static Scala code, consisting of:
+- [State]s, represented by case object or case classes,
+- [Transition]s, represented by simple partial functions of type `State => Future[State]`.
 
-Library provides specialized traits for implementing service and controller components.
+Library provides specialized traits for implementing Play service and controller components.
 
 Rich Actions DSL offers a wide variety of ready-to-use mappings between endpoints and transitions.
 
