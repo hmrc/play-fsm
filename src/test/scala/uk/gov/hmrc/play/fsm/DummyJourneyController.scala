@@ -49,10 +49,10 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
   val oldStart: Action[AnyContent] = action { implicit request =>
     journeyService
       .cleanBreadcrumbs(_ => Nil)
-      .flatMap(_ => apply(journeyService.model.start, redirect))
+      .flatMap(_ => helpers.apply(journeyService.model.start, helpers.redirect))
   }
 
-  val oldShowStart: Action[AnyContent] = actionShowState {
+  val oldShowStart: Action[AnyContent] = legacy.actionShowState {
     case State.Start =>
   }
 
@@ -99,7 +99,7 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
 
   def oldContinue: Action[AnyContent] =
     action { implicit request =>
-      whenAuthorisedWithForm(asUser)(ArgForm)(Transitions.continue)
+      legacy.whenAuthorisedWithForm(asUser)(ArgForm)(Transitions.continue)
     }
 
   def bindFormAndApplyTransitionContinue: Action[AnyContent] =
@@ -192,9 +192,10 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
       .bindForm(ArgForm)
       .applyWithRequest(_ => Transitions.continue)
 
-  val oldShowContinue: Action[AnyContent] = actionShowStateWhenAuthorised(asUser) {
-    case State.Continue(_) =>
-  }
+  val oldShowContinue: Action[AnyContent] =
+    legacy.actionShowStateWhenAuthorised(asUser) {
+      case State.Continue(_) =>
+    }
 
   val whenAuthorisedShowContinueOrRollback: Action[AnyContent] =
     actions
@@ -260,7 +261,7 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
       .orRedirectTo(Call("GET", "/dummy"))
 
   val oldStop: Action[AnyContent] = action { implicit request =>
-    whenAuthorised(asUser)(Transitions.stop)(redirect)
+    legacy.whenAuthorised(asUser)(Transitions.stop)(helpers.redirect)
   }
 
   val whenAuthorisedApplyTransitionStop: Action[AnyContent] =
@@ -339,9 +340,10 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
       .applyWithRequest(_ => Transitions.stop(555))
       .redirectOrDisplayIf[State.Continue]
 
-  val showStop: Action[AnyContent] = actionShowStateWhenAuthorised(asUser) {
-    case State.Stop(_) =>
-  }
+  val showStop: Action[AnyContent] =
+    legacy.actionShowStateWhenAuthorised(asUser) {
+      case State.Stop(_) =>
+    }
 
   val showStopDsl: Action[AnyContent] =
     actions

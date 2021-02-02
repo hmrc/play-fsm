@@ -23,16 +23,31 @@ import scala.concurrent.ExecutionContext.Implicits.global
   * Journey Model is a base trait of a Finite State Machine,
   * consisting of states and transitions modelling the logic
   * of the business process flow.
-  *
-  * @see https://brilliant.org/wiki/finite-state-machines/
   */
 trait JourneyModel {
 
   /**
-    * State can be anything but usually it will be a set of case classes or objects
-    * representing the progress and data of a business process or transaction.
+    * State can be anything but usually it will be a set of case classes or case objects
+    * representing the stages and data of a business process or transaction.
     */
   type State
+
+  /** Where your journey starts by default */
+  val root: State
+
+  /** Built-in transition from anywhere to the root state */
+  final val start = Transition {
+    case _ => goto(root)
+  }
+
+  /** Replace the current state with the new one. */
+  final def goto(state: State): Future[State] = Future.successful(state)
+
+  /** Fail the transition */
+  final def fail[T](exception: Exception): Future[T] = Future.failed(exception)
+
+  /** Stay in the current state */
+  final def stay[T]: Future[T] = Future.failed(StayInCurrentState)
 
   /**
     * Transition from one state to the another.
@@ -58,14 +73,18 @@ trait JourneyModel {
   }
 
   /** Transition builder helper */
-  protected object Transition {
-    def apply(rules: PartialFunction[State, Future[State]]): Transition = new Transition(rules)
+  protected final object Transition {
+    def apply(rules: PartialFunction[State, Future[State]]): Transition =
+      new Transition(rules)
   }
 
-  case class TransitionNotAllowed(state: State, breadcrumbs: List[State], transition: Transition)
-      extends Exception
+  final case class TransitionNotAllowed(
+    state: State,
+    breadcrumbs: List[State],
+    transition: Transition
+  ) extends Exception
 
-  case object StayInCurrentState extends Exception
+  final case object StayInCurrentState extends Exception
 
   /**
     * Merger is a partial function of type `(S <: State, State) => S`,
@@ -84,24 +103,8 @@ trait JourneyModel {
   }
 
   /** Merger builder helper */
-  protected object Merger {
-    def apply[S <: State](merge: PartialFunction[(S, State), S]): Merger[S] = new Merger(merge)
+  protected final object Merger {
+    def apply[S <: State](merge: PartialFunction[(S, State), S]): Merger[S] =
+      new Merger(merge)
   }
-
-  /** Where your journey starts by default */
-  val root: State
-
-  /** Built-in transition from anywhere to the root state */
-  protected[fsm] final val start = Transition {
-    case _ => goto(root)
-  }
-
-  /** Replace the current state with the new one. */
-  final def goto(state: State): Future[State] = Future.successful(state)
-
-  /** Fail the transition */
-  final def fail[T](exception: Exception): Future[T] = Future.failed(exception)
-
-  /** Stay in the current state */
-  final def stay[T]: Future[T] = Future.failed(StayInCurrentState)
 }
