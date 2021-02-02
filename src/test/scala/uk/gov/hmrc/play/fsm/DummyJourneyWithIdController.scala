@@ -49,32 +49,35 @@ class DummyJourneyWithIdController @Inject() (override val journeyService: Dummy
   val start: Action[AnyContent] = action { implicit request =>
     journeyService
       .cleanBreadcrumbs(_ => Nil)
-      .flatMap(_ => apply(journeyService.model.start, display))
+      .flatMap(_ => helpers.apply(journeyService.model.start, helpers.display))
   }
 
-  val showStart: Action[AnyContent] = actionShowState {
+  val showStart: Action[AnyContent] = legacy.actionShowState {
     case State.Start =>
   }
 
   def continue: Action[AnyContent] =
     action { implicit request =>
-      whenAuthorisedWithForm(asUser)(ArgForm)(Transitions.continue)
+      legacy.whenAuthorisedWithForm(asUser)(ArgForm)(Transitions.continue)
     }
 
-  val showContinue: Action[AnyContent] = actionShowStateWhenAuthorised(asUser) {
-    case State.Continue(_) =>
-  }
+  val showContinue: Action[AnyContent] =
+    legacy.actionShowStateWhenAuthorised(asUser) {
+      case State.Continue(_) =>
+    }
 
   val stop: Action[AnyContent] = action { implicit request =>
-    whenAuthorised(asUser)(Transitions.stop)(redirect)
+    legacy.whenAuthorised(asUser)(Transitions.stop)(helpers.redirect)
   }
 
   val showStop: Action[AnyContent] = action { implicit request =>
-    showStateWhenAuthorised(asUser) {
-      case State.Stop(_) =>
-    }.andThen {
-      case Success(_) => journeyService.cleanBreadcrumbs()
-    }
+    legacy
+      .showStateWhenAuthorised(asUser) {
+        case State.Stop(_) =>
+      }
+      .andThen {
+        case Success(_) => journeyService.cleanBreadcrumbs()
+      }
   }
 
   // VIEWS
