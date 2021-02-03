@@ -17,8 +17,9 @@
 package uk.gov.hmrc.play.fsm
 
 import play.api.data.Form
-import play.api.mvc.{Flash, Request}
+import play.api.mvc.Request
 
+/** Extension methods for Option[Form[_]]. */
 object OptionalFormOps {
   implicit class OptionalForm(val formWithErrors: Option[Form[_]]) extends AnyVal {
 

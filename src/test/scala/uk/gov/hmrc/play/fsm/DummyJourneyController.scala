@@ -24,17 +24,22 @@ import play.twirl.api.Html
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import java.util.concurrent.TimeoutException
+import akka.actor.Scheduler
+import akka.actor.ActorSystem
 
 @Singleton
 class DummyJourneyController @Inject() (override val journeyService: DummyJourneyService)(implicit
-  ec: ExecutionContext
-) extends Controller
+  ec: ExecutionContext,
+  actorSystem: ActorSystem
+) extends InjectedController
     with JourneyController[DummyContext] {
 
   import DummyJourneyController._
-  import journeyService.model.{Mergers, State, Transition, Transitions}
+  import journeyService.model.{Mergers, State, Transitions}
 
   override implicit def context(implicit rh: RequestHeader): DummyContext = DummyContext()
+
+  implicit val scheduler: Scheduler = actorSystem.scheduler
 
   val asUser: WithAuthorised[Int] = { implicit request => body =>
     body(5)
@@ -52,9 +57,10 @@ class DummyJourneyController @Inject() (override val journeyService: DummyJourne
       .flatMap(_ => helpers.apply(journeyService.model.start, helpers.redirect))
   }
 
-  val oldShowStart: Action[AnyContent] = legacy.actionShowState {
-    case State.Start =>
-  }
+  val oldShowStart: Action[AnyContent] =
+    legacy.actionShowState {
+      case State.Start =>
+    }
 
   val showStart: Action[AnyContent] =
     actions
