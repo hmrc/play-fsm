@@ -393,21 +393,22 @@ trait JourneyController[RequestContext] {
       * Check in intervals. If the timeout expires, execute ifTimeout.
       */
     final def waitFor[S <: State: ClassTag](
-      interval: Long,
-      maxTimestamp: Long
+      intervalInMiliseconds: Long,
+      timeoutNanoTime: Long
     )(outcomeFactory: OutcomeFactory)(ifTimeout: Request[_] => Future[Result])(implicit
       rc: RequestContext,
       request: Request[_],
-      ec: ExecutionContext
+      ec: ExecutionContext,
+      scheduler: akka.actor.Scheduler
     ): Future[Result] =
       journeyService.currentState.flatMap {
         case Some(sb @ (state, _)) if is[S](state) =>
           Future.successful(outcomeFactory(sb)(request))
         case _ =>
-          if (System.nanoTime() > maxTimestamp) ifTimeout(request)
+          if (System.nanoTime() > timeoutNanoTime) ifTimeout(request)
           else
-            Schedule(interval) {
-              waitFor[S](interval, maxTimestamp)(outcomeFactory)(ifTimeout)
+            ScheduleAfter(intervalInMiliseconds) {
+              waitFor[S](intervalInMiliseconds * 2, timeoutNanoTime)(outcomeFactory)(ifTimeout)
             }
       }
 
@@ -1429,7 +1430,9 @@ trait JourneyController[RequestContext] {
         * Wait until the state becomes of S type and display it using default [[renderState]],
         * or if timeout expires raise a [[java.util.concurrent.TimeoutException]].
         */
-      final def waitForStateAndDisplay[S <: State: ClassTag](timeoutInSeconds: Int): WaitFor[S] =
+      final def waitForStateAndDisplay[S <: State: ClassTag](
+        timeoutInSeconds: Int
+      )(implicit scheduler: akka.actor.Scheduler): WaitFor[S] =
         new WaitFor[S](timeoutInSeconds)(JourneyController.this.helpers.display)
 
       /**
@@ -1439,19 +1442,22 @@ trait JourneyController[RequestContext] {
       final def waitForStateAndDisplayUsing[S <: State: ClassTag](
         timeoutInSeconds: Int,
         renderer: Renderer
-      ): WaitFor[S] =
+      )(implicit scheduler: akka.actor.Scheduler): WaitFor[S] =
         new WaitFor[S](timeoutInSeconds)(JourneyController.this.helpers.displayUsing(renderer))
 
       /**
         * Wait until the state becomes of S type and redirect to it,
         * or if timeout expires raise a [[java.util.concurrent.TimeoutException]].
         */
-      final def waitForStateThenRedirect[S <: State: ClassTag](timeoutInSeconds: Int): WaitFor[S] =
+      final def waitForStateThenRedirect[S <: State: ClassTag](
+        timeoutInSeconds: Int
+      )(implicit scheduler: akka.actor.Scheduler): WaitFor[S] =
         new WaitFor[S](timeoutInSeconds)(JourneyController.this.helpers.redirect)
 
       final class WaitFor[S <: State: ClassTag] private[fsm] (timeoutInSeconds: Int)(
         outcomeFactory: OutcomeFactory
-      ) extends Executable {
+      )(implicit scheduler: akka.actor.Scheduler)
+          extends Executable {
         override def execute(
           settings: Settings
         )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
@@ -1465,10 +1471,17 @@ trait JourneyController[RequestContext] {
         private def waitForUsing(
           ifTimeout: Request[_] => Future[Result],
           outcomeFactory: OutcomeFactory
-        )(implicit request: Request[_], ec: ExecutionContext): Future[Result] = {
-          implicit val rc: RequestContext = JourneyController.this.context(request)
-          val maxTimestamp: Long          = System.nanoTime() + timeoutInSeconds * 1000000000L
-          JourneyController.this.helpers.waitFor[S](500, maxTimestamp)(outcomeFactory)(ifTimeout)
+        )(implicit
+          request: Request[_],
+          ec: ExecutionContext
+        ): Future[Result] = {
+          implicit val rc: RequestContext =
+            JourneyController.this.context(request)
+
+          val timeoutNanoTime: Long =
+            System.nanoTime() + timeoutInSeconds * 1000000000L
+
+          JourneyController.this.helpers.waitFor[S](500, timeoutNanoTime)(outcomeFactory)(ifTimeout)
         }
 
         /**

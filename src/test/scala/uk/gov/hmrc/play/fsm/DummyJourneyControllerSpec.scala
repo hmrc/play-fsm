@@ -30,6 +30,7 @@ import play.api.libs.json.Json
 import akka.stream.Materializer
 import scala.concurrent.Future
 import java.util.concurrent.TimeoutException
+import akka.actor.Scheduler
 
 class DummyJourneyControllerSpec
     extends UnitSpec
@@ -37,17 +38,23 @@ class DummyJourneyControllerSpec
     with StateAndBreadcrumbsMatchers {
 
   import scala.concurrent.duration._
+
   implicit override val defaultTimeout: FiniteDuration = 360 seconds
+
+  implicit val scheduler: Scheduler = app.actorSystem.scheduler
+
+  implicit lazy val materializer: Materializer = app.materializer
 
   implicit val context: DummyContext = DummyContext()
 
-  override lazy val app: Application = new GuiceApplicationBuilder().build()
+  override lazy val app: Application =
+    new GuiceApplicationBuilder().build()
 
-  lazy val journeyState: DummyJourneyService = app.injector.instanceOf[DummyJourneyService]
+  lazy val journeyState: DummyJourneyService =
+    app.injector.instanceOf[DummyJourneyService]
+
   lazy val controller: DummyJourneyController =
     app.injector.instanceOf[DummyJourneyController]
-
-  implicit lazy val materializer: Materializer = app.materializer
 
   import journeyState.model.State
 
@@ -1272,7 +1279,7 @@ class DummyJourneyControllerSpec
 
     "dsl1: after GET /wait show Continue when ready" in {
       journeyState.set(State.Start, Nil)
-      Schedule(1000) {
+      ScheduleAfter(1000) {
         Future {
           journeyState.set(State.Continue("stop"), List(State.Start))
         }
@@ -1287,7 +1294,7 @@ class DummyJourneyControllerSpec
 
     "dsl1_1: after GET /wait show Continue when ready" in {
       journeyState.set(State.Start, Nil)
-      Schedule(1000) {
+      ScheduleAfter(1000) {
         Future {
           journeyState.set(State.Continue("stop"), List(State.Start))
         }
@@ -1318,7 +1325,7 @@ class DummyJourneyControllerSpec
 
     "dsl2: after GET /wait show Continue when ready" in {
       journeyState.set(State.Start, Nil)
-      Schedule(1000) {
+      ScheduleAfter(1000) {
         Future {
           journeyState.set(State.Continue("stop"), List(State.Start))
         }
@@ -1343,7 +1350,7 @@ class DummyJourneyControllerSpec
 
     "dsl3: after GET /wait show Continue when ready" in {
       journeyState.set(State.Start, Nil)
-      Schedule(1000) {
+      ScheduleAfter(1000) {
         Future {
           journeyState.set(State.Continue("stop"), List(State.Start))
         }
@@ -1368,7 +1375,7 @@ class DummyJourneyControllerSpec
 
     "dsl4: after GET /wait show Continue when ready" in {
       journeyState.set(State.Start, Nil)
-      Schedule(1000) {
+      ScheduleAfter(1000) {
         Future {
           journeyState.set(State.Continue("stop"), List(State.Start))
         }
@@ -1391,7 +1398,7 @@ class DummyJourneyControllerSpec
 
     "dsl5: after GET /wait show Continue when ready" in {
       journeyState.set(State.Start, Nil)
-      Schedule(1000) {
+      ScheduleAfter(1000) {
         Future {
           journeyState.set(State.Continue("stop"), List(State.Start))
         }
@@ -1416,7 +1423,7 @@ class DummyJourneyControllerSpec
 
     "dsl6: after GET /wait show Continue when ready" in {
       journeyState.set(State.Start, Nil)
-      Schedule(1000) {
+      ScheduleAfter(1000) {
         Future {
           journeyState.set(State.Continue("stop"), List(State.Start))
         }
@@ -1441,7 +1448,7 @@ class DummyJourneyControllerSpec
 
     "dsl7: after GET /wait show Continue when ready" in {
       journeyState.set(State.Start, Nil)
-      Schedule(1000) {
+      ScheduleAfter(1000) {
         Future {
           journeyState.set(State.Continue("stop"), List(State.Start))
         }
@@ -1466,7 +1473,7 @@ class DummyJourneyControllerSpec
 
     "dsl8: after GET /wait show Continue when ready" in {
       journeyState.set(State.Start, Nil)
-      Schedule(1000) {
+      ScheduleAfter(1000) {
         Future {
           journeyState.set(State.Continue("stop"), List(State.Start))
         }
@@ -1491,7 +1498,7 @@ class DummyJourneyControllerSpec
 
     "dsl11: after GET /wait show Continue when ready" in {
       journeyState.set(State.Start, Nil)
-      Schedule(1000) {
+      ScheduleAfter(1000) {
         Future {
           journeyState.set(State.Continue("stop"), List(State.Start))
         }
@@ -1506,7 +1513,7 @@ class DummyJourneyControllerSpec
 
     "dsl11_1: after GET /wait show Continue when ready" in {
       journeyState.set(State.Start, Nil)
-      Schedule(1000) {
+      ScheduleAfter(1000) {
         Future {
           journeyState.set(State.Continue("stop"), List(State.Start))
         }
@@ -1537,7 +1544,7 @@ class DummyJourneyControllerSpec
 
     "dsl12: after GET /wait show Continue when ready" in {
       journeyState.set(State.Start, Nil)
-      Schedule(1000) {
+      ScheduleAfter(1000) {
         Future {
           journeyState.set(State.Continue("stop"), List(State.Start))
         }
@@ -1562,7 +1569,7 @@ class DummyJourneyControllerSpec
 
     "dsl13: after GET /wait show Continue when ready" in {
       journeyState.set(State.Start, Nil)
-      Schedule(1000) {
+      ScheduleAfter(1000) {
         Future {
           journeyState.set(State.Continue("stop"), List(State.Start))
         }
@@ -1587,7 +1594,7 @@ class DummyJourneyControllerSpec
 
     "dsl14: after GET /wait show Continue when ready" in {
       journeyState.set(State.Start, Nil)
-      Schedule(1000) {
+      ScheduleAfter(1000) {
         Future {
           journeyState.set(State.Continue("stop"), List(State.Start))
         }
@@ -1610,7 +1617,7 @@ class DummyJourneyControllerSpec
 
     "dsl15: after GET /wait show Continue when ready" in {
       journeyState.set(State.Start, Nil)
-      Schedule(1000) {
+      ScheduleAfter(1000) {
         Future {
           journeyState.set(State.Continue("stop"), List(State.Start))
         }
@@ -1635,7 +1642,7 @@ class DummyJourneyControllerSpec
 
     "dsl16: after GET /wait show Continue when ready" in {
       journeyState.set(State.Start, Nil)
-      Schedule(1000) {
+      ScheduleAfter(1000) {
         Future {
           journeyState.set(State.Continue("stop"), List(State.Start))
         }
@@ -1660,7 +1667,7 @@ class DummyJourneyControllerSpec
 
     "dsl17: after GET /wait show Continue when ready" in {
       journeyState.set(State.Start, Nil)
-      Schedule(1000) {
+      ScheduleAfter(1000) {
         Future {
           journeyState.set(State.Continue("stop"), List(State.Start))
         }
@@ -1685,7 +1692,7 @@ class DummyJourneyControllerSpec
 
     "dsl18: after GET /wait show Continue when ready" in {
       journeyState.set(State.Start, Nil)
-      Schedule(1000) {
+      ScheduleAfter(1000) {
         Future {
           journeyState.set(State.Continue("stop"), List(State.Start))
         }
