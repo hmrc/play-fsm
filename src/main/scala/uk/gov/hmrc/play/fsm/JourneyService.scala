@@ -20,7 +20,10 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
 
 /**
-  * JourneyService is an abstract base of components exposing journey to the application (controller)
+  * JourneyService is an abstract base of components exposing journey state
+  * to the application controller.
+  *
+  * @tparam RequestContext type of the context object available implicitly across all actions
   */
 trait JourneyService[RequestContext] {
 

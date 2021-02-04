@@ -27,7 +27,7 @@ class DummyJourneyStateFormatsSpec extends UnitSpec {
     "serialize and deserialize state" when {
 
       "Start" in {
-        Json.toJson(State.Start) shouldBe Json
+        Json.toJson[State](State.Start) shouldBe Json
           .obj("state" -> "Start")
         Json
           .parse("""{"state":"Start"}""")
@@ -35,7 +35,7 @@ class DummyJourneyStateFormatsSpec extends UnitSpec {
       }
 
       "Continue" in {
-        Json.toJson(State.Continue("dummy")) shouldBe Json
+        Json.toJson[State](State.Continue("dummy")) shouldBe Json
           .obj("state" -> "Continue", "properties" -> Json.obj("arg" -> "dummy"))
         Json
           .parse("""{"state":"Continue", "properties":{"arg":"dummy"}}""")
@@ -43,7 +43,7 @@ class DummyJourneyStateFormatsSpec extends UnitSpec {
       }
 
       "Stop" in {
-        Json.toJson(State.Stop("foo")) shouldBe Json
+        Json.toJson[State](State.Stop("foo")) shouldBe Json
           .obj("state" -> "Stop", "properties" -> Json.obj("result" -> "foo"))
         Json
           .parse("""{"state":"Stop","properties":{"result":"foo"}}""")

@@ -31,6 +31,7 @@ import akka.stream.Materializer
 import scala.concurrent.Future
 import java.util.concurrent.TimeoutException
 import akka.actor.Scheduler
+import scala.language.postfixOps
 
 class DummyJourneyControllerSpec
     extends UnitSpec

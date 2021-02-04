@@ -26,9 +26,12 @@ import scala.concurrent.ExecutionContext
 import scala.util.Success
 
 @Singleton
-class DummyJourneyWithIdController @Inject() (override val journeyService: DummyJourneyService)(
-  implicit ec: ExecutionContext
-) extends Controller
+class DummyJourneyWithIdController @Inject() (
+  override val journeyService: DummyJourneyService,
+  override val actionBuilder: DefaultActionBuilder
+)(implicit
+  ec: ExecutionContext
+) extends InjectedController
     with JourneyController[DummyContext]
     with JourneyIdSupport[DummyContext] {
 
