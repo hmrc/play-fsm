@@ -16,7 +16,7 @@ lazy val scoverageSettings = {
 }
 
 lazy val library = Project(libName, file("."))
-  .enablePlugins(play.sbt.PlayScala, SbtAutoBuildPlugin, SbtGitVersioning, SbtArtifactory)
+  .enablePlugins(play.sbt.PlayScala, SbtAutoBuildPlugin, SbtGitVersioning)
   .disablePlugins(PlayLayoutPlugin)
   .settings(
     makePublicallyAvailableOnBintray := true,
@@ -27,14 +27,10 @@ lazy val library = Project(libName, file("."))
     scalaVersion := "2.12.12",
     libraryDependencies ++= PlayCrossCompilation.dependencies(
       shared = Seq(
-        "org.scalatest"     %% "scalatest"  % "3.0.8"             % Test,
-        "org.pegdown"        % "pegdown"    % "1.6.0"             % Test,
-        "org.scalacheck"    %% "scalacheck" % "1.14.3"            % Test,
-        "com.typesafe.play" %% "play-test"  % PlayVersion.current % Test
-      ),
-      play25 = Seq(
-        "com.typesafe.play"      %% "play-json"          % "2.5.19",
-        "org.scalatestplus.play" %% "scalatestplus-play" % "2.0.1" % Test
+        "org.scalatest"       %% "scalatest"    % "3.2.3"             % Test,
+        "com.vladsch.flexmark" % "flexmark-all" % "0.36.8"            % Test,
+        "org.scalacheck"      %% "scalacheck"   % "1.14.3"            % Test,
+        "com.typesafe.play"   %% "play-test"    % PlayVersion.current % Test
       ),
       play26 = Seq(
         "com.typesafe.play"      %% "play-json"          % "2.6.14",
@@ -43,9 +39,13 @@ lazy val library = Project(libName, file("."))
       play27 = Seq(
         "com.typesafe.play"      %% "play-json"          % "2.7.4",
         "org.scalatestplus.play" %% "scalatestplus-play" % "4.0.3" % Test
+      ),
+      play28 = Seq(
+        "com.typesafe.play"      %% "play-json"          % "2.8.1",
+        "org.scalatestplus.play" %% "scalatestplus-play" % "5.1.0" % Test
       )
     ),
-    crossScalaVersions := List("2.11.12", "2.12.12"),
+    crossScalaVersions := List("2.12.12"),
     resolvers := Seq(
       Resolver.bintrayRepo("hmrc", "releases"),
       "typesafe-releases" at "https://repo.typesafe.com/typesafe/releases/"

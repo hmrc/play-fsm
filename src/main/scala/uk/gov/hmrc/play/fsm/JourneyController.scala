@@ -26,22 +26,23 @@ import play.api.libs.json.Reads
 import java.util.concurrent.TimeoutException
 
 /**
-  * Controller mixin for journeys implementing Finite State Machine.
+  * Controller mixin for journeys using [[JourneyModel]].
   * Provides rich set of `actions.` DSL.
   *
-  * Final controller class should override four extension points:
+  * Final controller class should override these extension points:
   *
-  *   - [[getCallFor]]: mapping of states to endpoints
-  *   - [[renderState]]: mapping of states to views
-  *   - [[context]]: custom request context to carry over to the service layer
+  *   - [[journeyService]]: journey service instance
+  *   - [[actionBuilder]]: Play helper for creating [[Action]] values
+  *   - [[getCallFor]]: function mapping states to endpoints
+  *   - [[renderState]]: function mapping states to views
+  *   - [[context]]: function transforming request into a custom context object
   *   - [[withValidRequest]]: http request interceptor and validator
   *
   * Consider using together with [[JourneyIdSupport]].
+  *
+  * @tparam RequestContext type of the custom context object available implicitly across all actions
   */
 trait JourneyController[RequestContext] {
-
-  /** This has to be injected in the concrete controller */
-  val journeyService: JourneyService[RequestContext]
 
   import journeyService.{Breadcrumbs, StateAndBreadcrumbs}
   import journeyService.model
@@ -51,18 +52,32 @@ trait JourneyController[RequestContext] {
   // EXTENSION POINTS
   //-------------------------------------------------
 
-  /** Implement to map states into endpoints for redirection and back linking */
+  /** Service providing state management functions. */
+  val journeyService: JourneyService[RequestContext]
+
+  /** Play helper for creating [[Action]] values. */
+  val actionBuilder: ActionBuilder[Request, AnyContent]
+
+  /**
+    * Function mapping FSM states to the endpoint calls.
+    * This function is invoked internally when the result of an action is
+    * to *redirect* to some state.
+    */
   def getCallFor(state: State)(implicit request: Request[_]): Call
 
-  /** Implement to render state after transition or when form validation fails */
+  /**
+    * Function mapping FSM states to Play results: views or redirections.
+    * This function is invoked internally when the result of an action is
+    * to *display* some state.
+    */
   def renderState(state: State, breadcrumbs: Breadcrumbs, formWithErrors: Option[Form[_]])(implicit
     request: Request[_]
   ): Result
 
-  /** Implement to provide customized request context you require in the service layer * */
+  /** Implement to provide function transforming request into a custom context object. * */
   def context(implicit rh: RequestHeader): RequestContext
 
-  /** Interceptor: override to do basic checks on every incoming request (headers, session, etc.) */
+  /** Override to do basic checks on every incoming request (headers, session, etc.). */
   def withValidRequest(
     body: => Future[Result]
   )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
@@ -585,7 +600,7 @@ trait JourneyController[RequestContext] {
   final def action(
     body: Request[_] => Future[Result]
   )(implicit ec: ExecutionContext): Action[AnyContent] =
-    Action.async { implicit request =>
+    actionBuilder.async { implicit request =>
       implicit val rc: RequestContext = context(request)
       withValidRequest(body(request))
     }

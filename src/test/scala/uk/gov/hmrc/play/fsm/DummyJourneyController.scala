@@ -28,7 +28,10 @@ import akka.actor.Scheduler
 import akka.actor.ActorSystem
 
 @Singleton
-class DummyJourneyController @Inject() (override val journeyService: DummyJourneyService)(implicit
+class DummyJourneyController @Inject() (
+  override val journeyService: DummyJourneyService,
+  override val actionBuilder: DefaultActionBuilder
+)(implicit
   ec: ExecutionContext,
   actorSystem: ActorSystem
 ) extends InjectedController
