@@ -322,6 +322,18 @@ class DummyJourneyController @Inject() (
       .applyWithRequest(_ => Transitions.stop)
       .redirectOrDisplayIf[State.Stop]
 
+  val stopDsl9u: Action[AnyContent] =
+    actions
+      .whenAuthorisedWithRetrievals(asUser)
+      .applyWithRequest(_ => Transitions.stop)
+      .redirectOrDisplayUsingIf[State.Stop](implicit request => renderState2)
+
+  val stopDsl9ua: Action[AnyContent] =
+    actions
+      .whenAuthorisedWithRetrievals(asUser)
+      .applyWithRequest(_ => Transitions.stop)
+      .redirectOrDisplayAsyncUsingIf[State.Stop](implicit request => renderStateAsync2)
+
   val stopDsl10: Action[AnyContent] =
     actions
       .applyWithRequest(_ => Transitions.stop(555))
@@ -423,6 +435,15 @@ class DummyJourneyController @Inject() (
       .recover { case _ => BadRequest }
       .transform { case BadRequest => NotFound }
 
+  val parseJson3a: Action[AnyContent] =
+    actions
+      .whenAuthorisedWithRetrievals(asUser)
+      .parseJsonWithFallback[TestPayload](ifFailure = BadRequest)
+      .apply(user => Transitions.processPayload)
+      .displayAsyncUsing(implicit request => renderStateAsync2)
+      .recover { case _ => BadRequest }
+      .transform { case BadRequest => NotFound }
+
   val wait1: Action[AnyContent] =
     actions
       .whenAuthorisedWithRetrievals(asUser)
@@ -432,6 +453,11 @@ class DummyJourneyController @Inject() (
     actions
       .whenAuthorisedWithRetrievals(asUser)
       .waitForStateAndDisplayUsing[State.Continue](3, implicit request => renderState2)
+
+  val wait1_1a: Action[AnyContent] =
+    actions
+      .whenAuthorisedWithRetrievals(asUser)
+      .waitForStateAndDisplayAsyncUsing[State.Continue](3, implicit request => renderStateAsync2)
 
   val wait2: Action[AnyContent] =
     actions
@@ -481,6 +507,20 @@ class DummyJourneyController @Inject() (
       .waitForStateThenRedirect[State.Continue](3)
       .orApplyOnTimeout(Transitions.showContinue)
       .redirectOrDisplayIf[State.Continue]
+
+  val wait8u: Action[AnyContent] =
+    actions
+      .whenAuthorisedWithRetrievals(asUser)
+      .waitForStateThenRedirect[State.Continue](3)
+      .orApplyOnTimeout(Transitions.showContinue)
+      .redirectOrDisplayUsingIf[State.Continue](implicit request => renderState2)
+
+  val wait8ua: Action[AnyContent] =
+    actions
+      .whenAuthorisedWithRetrievals(asUser)
+      .waitForStateThenRedirect[State.Continue](3)
+      .orApplyOnTimeout(Transitions.showContinue)
+      .redirectOrDisplayAsyncUsingIf[State.Continue](implicit request => renderStateAsync2)
 
   val wait11: Action[AnyContent] =
     actions
@@ -532,6 +572,10 @@ class DummyJourneyController @Inject() (
   val current2: Action[AnyContent] =
     actions.showCurrentState
       .displayUsing(implicit request => renderState2)
+
+  val current2a: Action[AnyContent] =
+    actions.showCurrentState
+      .displayAsyncUsing(implicit request => renderStateAsync2)
 
   val current3: Action[AnyContent] =
     actions
@@ -595,6 +639,18 @@ class DummyJourneyController @Inject() (
       case State.Stop(result)    => Accepted("Stop")
       case State.DeadEnd(result) => NotFound("DeadEnd")
     }
+
+  def renderStateAsync2(
+    state: journeyService.model.State,
+    breadcrumbs: List[journeyService.model.State],
+    formWithErrors: Option[Form[_]]
+  )(implicit request: Request[_]): Future[Result] =
+    Future.successful(state match {
+      case State.Start           => Ok("Start")
+      case State.Continue(arg)   => Created("Continue")
+      case State.Stop(result)    => Accepted("Stop")
+      case State.DeadEnd(result) => NotFound("DeadEnd")
+    })
 }
 
 object DummyJourneyController {
