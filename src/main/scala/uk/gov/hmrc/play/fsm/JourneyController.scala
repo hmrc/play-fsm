@@ -87,9 +87,10 @@ trait JourneyController[RequestContext] {
   // INTERNAL TYPE ALIASES
   //-------------------------------------------------
 
-  type Outcome              = Request[_] => Result
+  type Outcome              = Request[_] => Future[Result]
   type OutcomeFactory       = StateAndBreadcrumbs => Outcome
   type Renderer             = Request[_] => (State, Breadcrumbs, Option[Form[_]]) => Result
+  type AsyncRenderer        = Request[_] => (State, Breadcrumbs, Option[Form[_]]) => Future[Result]
   type Fallback             = (RequestContext, Request[_], ExecutionContext) => Future[Result]
   type WithAuthorised[User] = Request[_] => (User => Future[Result]) => Future[Result]
 
@@ -135,17 +136,22 @@ trait JourneyController[RequestContext] {
 
     /** Display the current state using [[renderState]]. */
     final val display: OutcomeFactory = (state: StateAndBreadcrumbs) =>
-      (request: Request[_]) => renderState(state._1, state._2, None)(request)
+      (request: Request[_]) => Future.successful(renderState(state._1, state._2, None)(request))
 
     /** Display the current state using custom renderer. */
     final def displayUsing(renderState: Renderer): OutcomeFactory =
+      (state: StateAndBreadcrumbs) =>
+        (request: Request[_]) => Future.successful(renderState(request)(state._1, state._2, None))
+
+    /** Display the current state using custom asynchronous renderer. */
+    final def displayAsyncUsing(renderState: AsyncRenderer): OutcomeFactory =
       (state: StateAndBreadcrumbs) =>
         (request: Request[_]) => renderState(request)(state._1, state._2, None)
 
     /** Redirect to the current state using URL returned by [[getCallFor]]. */
     final val redirect: OutcomeFactory =
       (state: StateAndBreadcrumbs) =>
-        (request: Request[_]) => Results.Redirect(getCallFor(state._1)(request))
+        (request: Request[_]) => Future.successful(Results.Redirect(getCallFor(state._1)(request)))
 
     /**
       * If the current state is of type S then display using [[renderState]],
@@ -165,6 +171,17 @@ trait JourneyController[RequestContext] {
     ): OutcomeFactory = {
       case sb @ (state, breadcrumbs) =>
         if (is[S](state)) displayUsing(renderState)(sb) else redirect(sb)
+    }
+
+    /**
+      * If the current state is of type S then display using custom asynchronous renderer,
+      * otherwise redirect using URL returned by [[getCallFor]].
+      */
+    final def redirectOrDisplayAsyncUsingIf[S <: State: ClassTag](
+      renderState: AsyncRenderer
+    ): OutcomeFactory = {
+      case sb @ (state, breadcrumbs) =>
+        if (is[S](state)) displayAsyncUsing(renderState)(sb) else redirect(sb)
     }
 
     /**
@@ -188,6 +205,17 @@ trait JourneyController[RequestContext] {
     }
 
     /**
+      * If the current state is of type S then redirect using URL returned by [[getCallFor]],
+      * otherwise display using custom asynchronous renderer.
+      */
+    final def displayAsyncUsingOrRedirectIf[S <: State: ClassTag](
+      renderState: AsyncRenderer
+    ): OutcomeFactory = {
+      case sb @ (state, breadcrumbs) =>
+        if (is[S](state)) redirect(sb) else displayAsyncUsing(renderState)(sb)
+    }
+
+    /**
       * If the current state is same as the origin then display using [[renderState]],
       * otherwise redirect using URL returned by [[getCallFor]].
       */
@@ -208,6 +236,18 @@ trait JourneyController[RequestContext] {
         if (state == origin) displayUsing(renderState)(sb) else redirect(sb)
     }
 
+    /**
+      * If the current state is same as the origin then display using custom asynchronous renderer,
+      * otherwise redirect using URL returned by [[getCallFor]].
+      */
+    final def redirectOrDisplayAsyncUsingIfSame(
+      origin: State,
+      renderState: AsyncRenderer
+    ): OutcomeFactory = {
+      case sb @ (state, breadcrumbs) =>
+        if (state == origin) displayAsyncUsing(renderState)(sb) else redirect(sb)
+    }
+
     //-------------------------------------------------
     // TRANSITION HELPERS
     //-------------------------------------------------
@@ -223,14 +263,13 @@ trait JourneyController[RequestContext] {
       journeyService
         .apply(transition)
         .map(outcomeFactory)
-        .map(_(request))
+        .flatMap(_(request))
         .recoverWith {
           case TransitionNotAllowed(origin, breadcrumbs, _) =>
-            Future.successful(
-              outcomeFactory((origin, breadcrumbs))(request)
-            )
+            outcomeFactory((origin, breadcrumbs))(request)
+
           case StayInCurrentState =>
-            journeyService.currentState.map {
+            journeyService.currentState.flatMap {
               case Some((state, breadcrumbs)) =>
                 outcomeFactory((state, breadcrumbs))(request)
               case None =>
@@ -262,7 +301,7 @@ trait JourneyController[RequestContext] {
       journeyService.currentState
         .flatMap {
           case Some(sb) =>
-            Future.successful(redirect(sb)(request))
+            redirect(sb)(request)
 
           case None =>
             apply(journeyService.model.start, redirect)
@@ -301,7 +340,7 @@ trait JourneyController[RequestContext] {
         sbopt <- journeyService.currentState
         result <- sbopt match {
                     case Some(sb @ (state, breadcrumbs)) if is[S](state) =>
-                      Future.successful(outcomeFactory(sb)(request))
+                      outcomeFactory(sb)(request)
 
                     case Some((state, breadcrumbs))
                         if `rollback` && hasRecentState[S](breadcrumbs) =>
@@ -335,7 +374,7 @@ trait JourneyController[RequestContext] {
         sbopt <- journeyService.currentState
         result <- sbopt match {
                     case Some(sb @ (state, breadcrumbs)) if is[S](state) =>
-                      Future.successful(outcomeFactory(sb)(request))
+                      outcomeFactory(sb)(request)
 
                     case Some((state, breadcrumbs))
                         if `rollback` && hasRecentState[S](breadcrumbs) =>
@@ -418,7 +457,7 @@ trait JourneyController[RequestContext] {
     ): Future[Result] =
       journeyService.currentState.flatMap {
         case Some(sb @ (state, _)) if is[S](state) =>
-          Future.successful(outcomeFactory(sb)(request))
+          outcomeFactory(sb)(request)
         case _ =>
           if (System.nanoTime() > timeoutNanoTime) ifTimeout(request)
           else
@@ -442,7 +481,7 @@ trait JourneyController[RequestContext] {
         case None => fallback(rc, request, ec)
         case Some(sb @ (state, _)) =>
           if (is[S](state))
-            Future.successful(outcomeFactory(sb)(request))
+            outcomeFactory(sb)(request)
           else
             journeyService.stepBack.flatMap(rollbackTo[S](fallback, outcomeFactory))
       }
@@ -464,7 +503,7 @@ trait JourneyController[RequestContext] {
             journeyService
               .modify(modification)
               .map(outcomeFactory)
-              .map(_(request))
+              .flatMap(_(request))
           else
             journeyService.stepBack.flatMap(
               rollbackAndModify(modification)(fallback, outcomeFactory)
@@ -749,6 +788,24 @@ trait JourneyController[RequestContext] {
 
       /**
         * Change how the result is created.
+        * Force displaying the state after action using custom asynchronous renderer.
+        */
+      final def displayAsyncUsing(renderState: AsyncRenderer): Executable = {
+        val outer = this
+        new Executable {
+          def execute(
+            settings: Settings
+          )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+            outer.execute(
+              settings.setOutcomeFactory(
+                JourneyController.this.helpers.displayAsyncUsing(renderState)
+              )
+            )
+        }
+      }
+
+      /**
+        * Change how the result is created.
         * Force redirect to the state after action using URL returned by [[getCallFor]].
         */
       final def redirect: Executable = {
@@ -811,6 +868,31 @@ trait JourneyController[RequestContext] {
 
       /**
         * Change how the result is created.
+        * If the state after action didn't change then display using custom asynchronous renderer,
+        * otherwise redirect using URL returned by [[getCallFor]].
+        */
+      final def redirectOrDisplayAsyncUsingIfSame(renderState: AsyncRenderer): Executable = {
+        val outer = this
+        new Executable {
+          def execute(
+            settings: Settings
+          )(implicit request: Request[_], ec: ExecutionContext): Future[Result] = {
+            implicit val rc: RequestContext = context(request)
+            journeyService.currentState.flatMap { current =>
+              outer.execute(
+                settings.setOutcomeFactory(current.map {
+                  case sb @ (state, breadcrumbs) =>
+                    JourneyController.this.helpers
+                      .redirectOrDisplayAsyncUsingIfSame(state, renderState)
+                })
+              )
+            }
+          }
+        }
+      }
+
+      /**
+        * Change how the result is created.
         * If the state after action is of type S then display using [[renderState]],
         * otherwise redirect using URL returned by [[getCallFor]].
         */
@@ -846,6 +928,25 @@ trait JourneyController[RequestContext] {
 
       /**
         * Change how the result is created.
+        * If the state after action is of type S then display using custom asynchronous renderer,
+        * otherwise redirect using URL returned by [[getCallFor]].
+        */
+      final def redirectOrDisplayAsyncUsingIf[S <: State: ClassTag](
+        renderState: AsyncRenderer
+      ): Executable = {
+        val outer = this
+        val outcomeFactory: OutcomeFactory =
+          JourneyController.this.helpers.redirectOrDisplayAsyncUsingIf[S](renderState)
+        new Executable {
+          def execute(
+            settings: Settings
+          )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+            outer.execute(settings.setOutcomeFactory(outcomeFactory))
+        }
+      }
+
+      /**
+        * Change how the result is created.
         * If the state after action is of type S then redirect using URL returned by [[getCallFor]]
         * otherwise display using [[renderState]],.
         */
@@ -871,6 +972,25 @@ trait JourneyController[RequestContext] {
         val outer = this
         val outcomeFactory: OutcomeFactory =
           JourneyController.this.helpers.displayUsingOrRedirectIf[S](renderState)
+        new Executable {
+          def execute(
+            settings: Settings
+          )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+            outer.execute(settings.setOutcomeFactory(outcomeFactory))
+        }
+      }
+
+      /**
+        * Change how the result is created.
+        * If the state after action is of type S then redirect using URL returned by [[getCallFor]],
+        * otherwise display using custom asynchronous renderer.
+        */
+      final def displayAsyncUsingOrRedirectIf[S <: State: ClassTag](
+        renderState: AsyncRenderer
+      ): Executable = {
+        val outer = this
+        val outcomeFactory: OutcomeFactory =
+          JourneyController.this.helpers.displayAsyncUsingOrRedirectIf[S](renderState)
         new Executable {
           def execute(
             settings: Settings
@@ -1007,11 +1127,10 @@ trait JourneyController[RequestContext] {
             implicit val rc: RequestContext = context(request)
             JourneyController.this.journeyService.currentState.flatMap {
               case Some(sb @ (state, breadcrumbs)) =>
-                Future.successful(
-                  settings.outcomeFactoryWithDefault(JourneyController.this.helpers.display)(sb)(
-                    request
-                  )
+                settings.outcomeFactoryWithDefault(JourneyController.this.helpers.display)(sb)(
+                  request
                 )
+
               case None =>
                 JourneyController.this.helpers.redirectToStart
             }
@@ -1459,6 +1578,16 @@ trait JourneyController[RequestContext] {
         renderer: Renderer
       )(implicit scheduler: akka.actor.Scheduler): WaitFor[S] =
         new WaitFor[S](timeoutInSeconds)(JourneyController.this.helpers.displayUsing(renderer))
+
+      /**
+        * Wait until the state becomes of S type and display it using custom renderer,
+        * or if timeout expires raise a [[java.util.concurrent.TimeoutException]].
+        */
+      final def waitForStateAndDisplayAsyncUsing[S <: State: ClassTag](
+        timeoutInSeconds: Int,
+        renderer: AsyncRenderer
+      )(implicit scheduler: akka.actor.Scheduler): WaitFor[S] =
+        new WaitFor[S](timeoutInSeconds)(JourneyController.this.helpers.displayAsyncUsing(renderer))
 
       /**
         * Wait until the state becomes of S type and redirect to it,

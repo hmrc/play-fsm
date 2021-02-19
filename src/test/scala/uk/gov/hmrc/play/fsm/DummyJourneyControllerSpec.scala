@@ -937,6 +937,26 @@ class DummyJourneyControllerSpec
       )
     }
 
+    "dsl9u: after POST /stop transition to Stop when in Continue" in {
+      journeyState.set(State.Continue("dummy"), List(State.Start))
+      val result = controller.stopDsl9u(fakeRequest)
+      status(result) shouldBe 202
+      journeyState.get should have[State](
+        State.Stop("dummy"),
+        List(State.Continue("dummy"), State.Start)
+      )
+    }
+
+    "dsl9ua: after POST /stop transition to Stop when in Continue" in {
+      journeyState.set(State.Continue("dummy"), List(State.Start))
+      val result = controller.stopDsl9ua(fakeRequest)
+      status(result) shouldBe 202
+      journeyState.get should have[State](
+        State.Stop("dummy"),
+        List(State.Continue("dummy"), State.Start)
+      )
+    }
+
     "dsl10: after POST /stop transition to Stop when in Continue" in {
       journeyState.set(State.Continue("dummy"), List(State.Start))
       val result = controller.stopDsl10(fakeRequest)
@@ -1265,6 +1285,20 @@ class DummyJourneyControllerSpec
       )
     }
 
+    "dsl3a: after POST /payload go to Continue with new message" in {
+      journeyState.set(State.Continue("stop"), List(State.Start))
+      val result = controller.parseJson3a(
+        fakeRequest
+          .withBody[AnyContent](AnyContent(Json.parse("""{"msg":"hello"}""")))
+      )
+      status(result)        shouldBe 201
+      bodyOf(await(result)) shouldBe "Continue"
+      journeyState.get should have[State](
+        State.Continue("hello"),
+        List(State.Continue("stop"), State.Start)
+      )
+    }
+
     "dsl3: after POST /payload show BadRequest if wrong payload" in {
       journeyState.set(State.Continue("stop"), List(State.Start))
       val result = controller.parseJson3(
@@ -1301,6 +1335,21 @@ class DummyJourneyControllerSpec
         }
       }
       val result = controller.wait1_1(fakeRequest)
+      status(result) shouldBe 201
+      journeyState.get should have[State](
+        State.Continue("stop"),
+        List(State.Start)
+      )
+    }
+
+    "dsl1_1a: after GET /wait show Continue when ready" in {
+      journeyState.set(State.Start, Nil)
+      ScheduleAfter(1000) {
+        Future {
+          journeyState.set(State.Continue("stop"), List(State.Start))
+        }
+      }
+      val result = controller.wait1_1a(fakeRequest)
       status(result) shouldBe 201
       journeyState.get should have[State](
         State.Continue("stop"),
@@ -1487,10 +1536,60 @@ class DummyJourneyControllerSpec
       )
     }
 
+    "dsl8u: after GET /wait show Continue when ready" in {
+      journeyState.set(State.Start, Nil)
+      ScheduleAfter(1000) {
+        Future {
+          journeyState.set(State.Continue("stop"), List(State.Start))
+        }
+      }
+      val result = controller.wait8u(fakeRequest)
+      status(result) shouldBe 303
+      journeyState.get should have[State](
+        State.Continue("stop"),
+        List(State.Start)
+      )
+    }
+
+    "dsl8ua: after GET /wait show Continue when ready" in {
+      journeyState.set(State.Start, Nil)
+      ScheduleAfter(1000) {
+        Future {
+          journeyState.set(State.Continue("stop"), List(State.Start))
+        }
+      }
+      val result = controller.wait8ua(fakeRequest)
+      status(result) shouldBe 303
+      journeyState.get should have[State](
+        State.Continue("stop"),
+        List(State.Start)
+      )
+    }
+
     "dsl8: after GET /wait show Continue when timeout" in {
       journeyState.set(State.Start, Nil)
       val result = controller.wait8(fakeRequest)
       status(result) shouldBe 200
+      journeyState.get should have[State](
+        State.Continue("yummy"),
+        List(State.Start)
+      )
+    }
+
+    "dsl8u: after GET /wait show Continue when timeout" in {
+      journeyState.set(State.Start, Nil)
+      val result = controller.wait8u(fakeRequest)
+      status(result) shouldBe 201
+      journeyState.get should have[State](
+        State.Continue("yummy"),
+        List(State.Start)
+      )
+    }
+
+    "dsl8ua: after GET /wait show Continue when timeout" in {
+      journeyState.set(State.Start, Nil)
+      val result = controller.wait8ua(fakeRequest)
+      status(result) shouldBe 201
       journeyState.get should have[State](
         State.Continue("yummy"),
         List(State.Start)
@@ -1746,6 +1845,14 @@ class DummyJourneyControllerSpec
     "dsl2: after GET /current show current Start state" in {
       journeyState.set(State.Start, Nil)
       val result = controller.current2(fakeRequest)
+      status(result)        shouldBe 200
+      bodyOf(await(result)) shouldBe """Start"""
+      journeyState.get        should have[State](State.Start, Nil)
+    }
+
+    "dsl2a: after GET /current show current Start state" in {
+      journeyState.set(State.Start, Nil)
+      val result = controller.current2a(fakeRequest)
       status(result)        shouldBe 200
       bodyOf(await(result)) shouldBe """Start"""
       journeyState.get        should have[State](State.Start, Nil)
