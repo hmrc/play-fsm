@@ -39,7 +39,7 @@ Common implementation pitfals
 FSM approach
 ---
 
-Looking at the objectives, it becomes apparent we can model our requirements using a finite state machine concept. Process steps are states, and transitions represent user actions. Each state holds only the necessary information, and each transition can bring new user input or call external services. All steps and transitions form a single connected graph.
+Looking at the objectives, it becomes apparent we can model our requirements using a [finite state machine](https://en.wikipedia.org/wiki/Finite-state_machine) concept. Process steps are states, and transitions represent user actions. Each state holds only the necessary information, and each transition can bring new user input or call external services. All steps and transitions form a single connected graph.
 
 How `play-fsm` helps?
 ---
@@ -303,7 +303,14 @@ or
     val showCurrent: Action[AnyContent] = 
         actions
             .showCurrentState
-            .displayUsing(implicit request => renderState2)
+            .displayUsing(implicit request => renderState)
+```
+or
+```
+    val showCurrent: Action[AnyContent] = 
+        actions
+            .showCurrentState
+            .displayAsyncUsing(implicit request => renderStateAsync)
 ```
 
 - render the current state if matches the type S
@@ -452,7 +459,7 @@ or
     val stop: Action[AnyContent] = 
         actions
             .apply(Transitions.stop)
-            .displayUsing(implicit request => someRenderState2)
+            .displayUsing(implicit request => renderState)
 ```
 or 
 ```
@@ -460,7 +467,15 @@ or
         actions
             .show[State.Stop]
             .orRollback
-            .displayUsing(implicit request => someRenderState2)
+            .displayUsing(implicit request => renderState)
+```
+or 
+```
+    val stop: Action[AnyContent] = 
+        actions
+            .show[State.Stop]
+            .orRollback
+            .displayAsyncUsing(implicit request => renderStateAsync)
 ```
 
 - wait for an async change of state (e.g. waiting for a backend callback)
