@@ -6,7 +6,7 @@ play-fsm
 A pattern for stateful microservices using Scala and Play Framework
 ===
 
-[See slides introducing play-fsm concept](https://docs.google.com/presentation/d/1VTfwz3zhzOtjr-Wg_Ol2wjcmHM0n8qQcvbqSaOwaO80/edit?usp=sharing)
+[See slides introducing play-fsm concept](https://docs.google.com/presentation/d/1VTfwz3zhzOtjr-Wg_Ol2wjcmHM0n8qQcvbqSaOwaO80)
 
 What `stateful` means?
 ---
