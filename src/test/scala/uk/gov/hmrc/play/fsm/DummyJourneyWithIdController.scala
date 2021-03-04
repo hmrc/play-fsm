@@ -28,7 +28,8 @@ import scala.util.Success
 @Singleton
 class DummyJourneyWithIdController @Inject() (
   override val journeyService: DummyJourneyService,
-  override val actionBuilder: DefaultActionBuilder
+  override val actionBuilder: DefaultActionBuilder,
+  override val controllerComponents: ControllerComponents
 )(implicit
   ec: ExecutionContext
 ) extends InjectedController

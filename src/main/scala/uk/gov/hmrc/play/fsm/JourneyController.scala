@@ -24,6 +24,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
 import play.api.libs.json.Reads
 import java.util.concurrent.TimeoutException
+import play.api.data.FormBinding
 
 /**
   * Controller mixin for journeys using [[JourneyModel]].
@@ -93,6 +94,66 @@ trait JourneyController[RequestContext] {
   type AsyncRenderer        = Request[_] => (State, Breadcrumbs, Option[Form[_]]) => Future[Result]
   type Fallback             = (RequestContext, Request[_], ExecutionContext) => Future[Result]
   type WithAuthorised[User] = Request[_] => (User => Future[Result]) => Future[Result]
+
+  object Renderer {
+    def simple(f: PartialFunction[State, Result]): Renderer = {
+      (request: Request[_]) =>
+        (state: State, breadcrumbs: Breadcrumbs, formWithErrors: Option[Form[_]]) =>
+          f(state)
+    }
+
+    def withRequest(f: Request[_] => PartialFunction[State, Result]): Renderer = {
+      (request: Request[_]) =>
+        (state: State, breadcrumbs: Breadcrumbs, formWithErrors: Option[Form[_]]) =>
+          f(request)(state)
+    }
+
+    def withRequestAndForm(
+      f: Request[_] => Option[Form[_]] => PartialFunction[State, Result]
+    ): Renderer = {
+      (request: Request[_]) =>
+        (state: State, breadcrumbs: Breadcrumbs, formWithErrors: Option[Form[_]]) =>
+          f(request)(formWithErrors)(state)
+    }
+
+    def apply(
+      f: Request[_] => Breadcrumbs => Option[Form[_]] => PartialFunction[State, Result]
+    ): Renderer = {
+      (request: Request[_]) =>
+        (state: State, breadcrumbs: Breadcrumbs, formWithErrors: Option[Form[_]]) =>
+          f(request)(breadcrumbs)(formWithErrors)(state)
+    }
+  }
+
+  object AsyncRenderer {
+    def simple(f: PartialFunction[State, Future[Result]]): AsyncRenderer = {
+      (request: Request[_]) =>
+        (state: State, breadcrumbs: Breadcrumbs, formWithErrors: Option[Form[_]]) =>
+          f(state)
+    }
+
+    def withRequest(f: Request[_] => PartialFunction[State, Future[Result]]): AsyncRenderer = {
+      (request: Request[_]) =>
+        (state: State, breadcrumbs: Breadcrumbs, formWithErrors: Option[Form[_]]) =>
+          f(request)(state)
+    }
+
+    def withRequestAndForm(
+      f: Request[_] => Option[Form[_]] => PartialFunction[State, Future[Result]]
+    ): AsyncRenderer = {
+      (request: Request[_]) =>
+        (state: State, breadcrumbs: Breadcrumbs, formWithErrors: Option[Form[_]]) =>
+          f(request)(formWithErrors)(state)
+    }
+
+    def apply(
+      f: Request[_] => Breadcrumbs => Option[Form[_]] => PartialFunction[State, Future[Result]]
+    ): AsyncRenderer = {
+      (request: Request[_]) =>
+        (state: State, breadcrumbs: Breadcrumbs, formWithErrors: Option[Form[_]]) =>
+          f(request)(breadcrumbs)(formWithErrors)(state)
+    }
+  }
 
   //-------------------------------------------------
   // BACKLINK HELPERS
@@ -524,7 +585,8 @@ trait JourneyController[RequestContext] {
     )(implicit
       rc: RequestContext,
       request: Request[_],
-      ec: ExecutionContext
+      ec: ExecutionContext,
+      formBinding: FormBinding
     ): Future[Result] =
       bindForm(form, transition, redirect, redirectToStart)
 
@@ -540,7 +602,8 @@ trait JourneyController[RequestContext] {
     )(implicit
       rc: RequestContext,
       request: Request[_],
-      ec: ExecutionContext
+      ec: ExecutionContext,
+      formBinding: FormBinding
     ): Future[Result] =
       form
         .bindFromRequest()
@@ -575,7 +638,8 @@ trait JourneyController[RequestContext] {
     )(implicit
       rc: RequestContext,
       request: Request[_],
-      ec: ExecutionContext
+      ec: ExecutionContext,
+      formBinding: FormBinding
     ): Future[Result] =
       journeyService.currentState.flatMap {
         case Some((state, _)) =>
@@ -631,7 +695,8 @@ trait JourneyController[RequestContext] {
 
   /** Implicitly converts Executable to an action. */
   implicit protected def build(executable: internal.Executable)(implicit
-    ec: ExecutionContext
+    ec: ExecutionContext,
+    formBinding: FormBinding
   ): Action[AnyContent] =
     action(implicit request => executable.execute(internal.Settings.default))
 
@@ -651,7 +716,11 @@ trait JourneyController[RequestContext] {
 
     private[fsm] final override def wrap(
       body: Resolver => Future[Result]
-    )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+    )(implicit
+      request: Request[_],
+      ec: ExecutionContext,
+      formBinding: FormBinding
+    ): Future[Result] =
       body(SimpleResolver)
 
     /**
@@ -724,7 +793,11 @@ trait JourneyController[RequestContext] {
         */
       def execute(
         settings: Settings
-      )(implicit request: Request[_], ec: ExecutionContext): Future[Result]
+      )(implicit
+        request: Request[_],
+        ec: ExecutionContext,
+        formBinding: FormBinding
+      ): Future[Result]
 
       /**
         * Run a task and continue if success.
@@ -743,7 +816,11 @@ trait JourneyController[RequestContext] {
         new Executable {
           def execute(
             settings: Settings
-          )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+          )(implicit
+            request: Request[_],
+            ec: ExecutionContext,
+            formBinding: FormBinding
+          ): Future[Result] =
             outer
               .execute(settings)
               .flatMap(result => task(request).map(_ => result))
@@ -765,7 +842,11 @@ trait JourneyController[RequestContext] {
         new Executable {
           def execute(
             settings: Settings
-          )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+          )(implicit
+            request: Request[_],
+            ec: ExecutionContext,
+            formBinding: FormBinding
+          ): Future[Result] =
             outer.execute(settings.setOutcomeFactory(JourneyController.this.helpers.display))
         }
       }
@@ -779,7 +860,11 @@ trait JourneyController[RequestContext] {
         new Executable {
           def execute(
             settings: Settings
-          )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+          )(implicit
+            request: Request[_],
+            ec: ExecutionContext,
+            formBinding: FormBinding
+          ): Future[Result] =
             outer.execute(
               settings.setOutcomeFactory(JourneyController.this.helpers.displayUsing(renderState))
             )
@@ -795,7 +880,11 @@ trait JourneyController[RequestContext] {
         new Executable {
           def execute(
             settings: Settings
-          )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+          )(implicit
+            request: Request[_],
+            ec: ExecutionContext,
+            formBinding: FormBinding
+          ): Future[Result] =
             outer.execute(
               settings.setOutcomeFactory(
                 JourneyController.this.helpers.displayAsyncUsing(renderState)
@@ -813,7 +902,11 @@ trait JourneyController[RequestContext] {
         new Executable {
           def execute(
             settings: Settings
-          )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+          )(implicit
+            request: Request[_],
+            ec: ExecutionContext,
+            formBinding: FormBinding
+          ): Future[Result] =
             outer.execute(settings.setOutcomeFactory(JourneyController.this.helpers.redirect))
         }
       }
@@ -828,7 +921,11 @@ trait JourneyController[RequestContext] {
         new Executable {
           def execute(
             settings: Settings
-          )(implicit request: Request[_], ec: ExecutionContext): Future[Result] = {
+          )(implicit
+            request: Request[_],
+            ec: ExecutionContext,
+            formBinding: FormBinding
+          ): Future[Result] = {
             implicit val rc: RequestContext = context(request)
             journeyService.currentState.flatMap { current =>
               outer.execute(
@@ -852,7 +949,11 @@ trait JourneyController[RequestContext] {
         new Executable {
           def execute(
             settings: Settings
-          )(implicit request: Request[_], ec: ExecutionContext): Future[Result] = {
+          )(implicit
+            request: Request[_],
+            ec: ExecutionContext,
+            formBinding: FormBinding
+          ): Future[Result] = {
             implicit val rc: RequestContext = context(request)
             journeyService.currentState.flatMap { current =>
               outer.execute(
@@ -876,7 +977,11 @@ trait JourneyController[RequestContext] {
         new Executable {
           def execute(
             settings: Settings
-          )(implicit request: Request[_], ec: ExecutionContext): Future[Result] = {
+          )(implicit
+            request: Request[_],
+            ec: ExecutionContext,
+            formBinding: FormBinding
+          ): Future[Result] = {
             implicit val rc: RequestContext = context(request)
             journeyService.currentState.flatMap { current =>
               outer.execute(
@@ -902,7 +1007,11 @@ trait JourneyController[RequestContext] {
         new Executable {
           def execute(
             settings: Settings
-          )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+          )(implicit
+            request: Request[_],
+            ec: ExecutionContext,
+            formBinding: FormBinding
+          ): Future[Result] =
             outer.execute(settings.setOutcomeFactory(outcomeFactory))
         }
       }
@@ -921,7 +1030,11 @@ trait JourneyController[RequestContext] {
         new Executable {
           def execute(
             settings: Settings
-          )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+          )(implicit
+            request: Request[_],
+            ec: ExecutionContext,
+            formBinding: FormBinding
+          ): Future[Result] =
             outer.execute(settings.setOutcomeFactory(outcomeFactory))
         }
       }
@@ -940,7 +1053,11 @@ trait JourneyController[RequestContext] {
         new Executable {
           def execute(
             settings: Settings
-          )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+          )(implicit
+            request: Request[_],
+            ec: ExecutionContext,
+            formBinding: FormBinding
+          ): Future[Result] =
             outer.execute(settings.setOutcomeFactory(outcomeFactory))
         }
       }
@@ -956,7 +1073,11 @@ trait JourneyController[RequestContext] {
         new Executable {
           def execute(
             settings: Settings
-          )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+          )(implicit
+            request: Request[_],
+            ec: ExecutionContext,
+            formBinding: FormBinding
+          ): Future[Result] =
             outer.execute(settings.setOutcomeFactory(outcomeFactory))
         }
       }
@@ -975,7 +1096,11 @@ trait JourneyController[RequestContext] {
         new Executable {
           def execute(
             settings: Settings
-          )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+          )(implicit
+            request: Request[_],
+            ec: ExecutionContext,
+            formBinding: FormBinding
+          ): Future[Result] =
             outer.execute(settings.setOutcomeFactory(outcomeFactory))
         }
       }
@@ -994,7 +1119,11 @@ trait JourneyController[RequestContext] {
         new Executable {
           def execute(
             settings: Settings
-          )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+          )(implicit
+            request: Request[_],
+            ec: ExecutionContext,
+            formBinding: FormBinding
+          ): Future[Result] =
             outer.execute(settings.setOutcomeFactory(outcomeFactory))
         }
       }
@@ -1005,7 +1134,11 @@ trait JourneyController[RequestContext] {
         new Executable {
           def execute(
             settings: Settings
-          )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+          )(implicit
+            request: Request[_],
+            ec: ExecutionContext,
+            formBinding: FormBinding
+          ): Future[Result] =
             outer.execute(settings).flatMap { result =>
               // clears journey history
               journeyService
@@ -1021,7 +1154,11 @@ trait JourneyController[RequestContext] {
         new Executable {
           def execute(
             settings: Settings
-          )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+          )(implicit
+            request: Request[_],
+            ec: ExecutionContext,
+            formBinding: FormBinding
+          ): Future[Result] =
             outer
               .execute(settings)
               .map(result => fx.applyOrElse[Result, Result](result, _ => result))
@@ -1036,7 +1173,11 @@ trait JourneyController[RequestContext] {
         new Executable {
           def execute(
             settings: Settings
-          )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+          )(implicit
+            request: Request[_],
+            ec: ExecutionContext,
+            formBinding: FormBinding
+          ): Future[Result] =
             outer.execute(settings).recover(recoveryStrategy)
         }
       }
@@ -1049,7 +1190,11 @@ trait JourneyController[RequestContext] {
         new Executable {
           def execute(
             settings: Settings
-          )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+          )(implicit
+            request: Request[_],
+            ec: ExecutionContext,
+            formBinding: FormBinding
+          ): Future[Result] =
             outer.execute(settings).recoverWith(recoveryStrategy(request))
         }
       }
@@ -1064,7 +1209,11 @@ trait JourneyController[RequestContext] {
 
       private[fsm] final override def wrap(
         body: Resolver => Future[Result]
-      )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+      )(implicit
+        request: Request[_],
+        ec: ExecutionContext,
+        formBinding: FormBinding
+      ): Future[Result] =
         withAuthorised(request) { _ =>
           body(SimpleResolver)
         }
@@ -1079,7 +1228,11 @@ trait JourneyController[RequestContext] {
 
       private[fsm] final override def wrap(
         body: Resolver => Future[Result]
-      )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+      )(implicit
+        request: Request[_],
+        ec: ExecutionContext,
+        formBinding: FormBinding
+      ): Future[Result] =
         withAuthorised(request) { user =>
           body(new SingleArgumentResolver(user))
         }
@@ -1110,7 +1263,11 @@ trait JourneyController[RequestContext] {
 
       private[fsm] def wrap(
         body: Resolver => Future[Result]
-      )(implicit request: Request[_], ec: ExecutionContext): Future[Result]
+      )(implicit
+        request: Request[_],
+        ec: ExecutionContext,
+        formBinding: FormBinding
+      ): Future[Result]
 
       /**
         * Displays the current state using default [[renderState]] function.
@@ -1122,7 +1279,11 @@ trait JourneyController[RequestContext] {
       final class ShowCurrentState private[fsm] () extends Executable {
         override def execute(
           settings: Settings
-        )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+        )(implicit
+          request: Request[_],
+          ec: ExecutionContext,
+          formBinding: FormBinding
+        ): Future[Result] =
           wrap { resolve =>
             implicit val rc: RequestContext = context(request)
             JourneyController.this.journeyService.currentState.flatMap {
@@ -1171,7 +1332,11 @@ trait JourneyController[RequestContext] {
 
         override def execute(
           settings: Settings
-        )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+        )(implicit
+          request: Request[_],
+          ec: ExecutionContext,
+          formBinding: FormBinding
+        ): Future[Result] =
           wrap { resolve =>
             implicit val rc: RequestContext = context(request)
             val outcomeFactory              = settings.outcomeFactoryWithDefault(defaultOutcomeFactory)
@@ -1226,7 +1391,11 @@ trait JourneyController[RequestContext] {
         final class OrApply private[fsm] (transition: Transition) extends Executable {
           override def execute(
             settings: Settings
-          )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+          )(implicit
+            request: Request[_],
+            ec: ExecutionContext,
+            formBinding: FormBinding
+          ): Future[Result] =
             wrap { resolve =>
               implicit val rc: RequestContext = JourneyController.this.context(request)
               val outcomeFactory              = settings.outcomeFactoryWithDefault(defaultOutcomeFactory)
@@ -1260,7 +1429,11 @@ trait JourneyController[RequestContext] {
             extends Executable {
           override def execute(
             settings: Settings
-          )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+          )(implicit
+            request: Request[_],
+            ec: ExecutionContext,
+            formBinding: FormBinding
+          ): Future[Result] =
             wrap { resolve =>
               implicit val rc: RequestContext = JourneyController.this.context(request)
               val outcomeFactory              = settings.outcomeFactoryWithDefault(defaultOutcomeFactory)
@@ -1336,7 +1509,11 @@ trait JourneyController[RequestContext] {
       final class Apply private[fsm] (transition: Transition) extends Executable {
         override def execute(
           settings: Settings
-        )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+        )(implicit
+          request: Request[_],
+          ec: ExecutionContext,
+          formBinding: FormBinding
+        ): Future[Result] =
           wrap { resolve =>
             implicit val rc: RequestContext = JourneyController.this.context(request)
             JourneyController.this.helpers
@@ -1355,7 +1532,11 @@ trait JourneyController[RequestContext] {
           extends Executable {
         override def execute(
           settings: Settings
-        )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+        )(implicit
+          request: Request[_],
+          ec: ExecutionContext,
+          formBinding: FormBinding
+        ): Future[Result] =
           wrap { resolve =>
             implicit val rc: RequestContext = JourneyController.this.context(request)
             JourneyController.this.helpers
@@ -1386,7 +1567,11 @@ trait JourneyController[RequestContext] {
         final class Apply private[fsm] (transition: TransitionWith[Payload]) extends Executable {
           override def execute(
             settings: Settings
-          )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+          )(implicit
+            request: Request[_],
+            ec: ExecutionContext,
+            formBinding: FormBinding
+          ): Future[Result] =
             wrap { resolve =>
               implicit val rc: RequestContext = JourneyController.this.context(request)
               JourneyController.this.helpers.bindForm(
@@ -1412,7 +1597,11 @@ trait JourneyController[RequestContext] {
         ) extends Executable {
           override def execute(
             settings: Settings
-          )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+          )(implicit
+            request: Request[_],
+            ec: ExecutionContext,
+            formBinding: FormBinding
+          ): Future[Result] =
             wrap { resolve =>
               implicit val rc: RequestContext = JourneyController.this.context(request)
               JourneyController.this.helpers.bindForm(
@@ -1447,7 +1636,11 @@ trait JourneyController[RequestContext] {
         final class Apply private[fsm] (transition: TransitionWith[Payload]) extends Executable {
           override def execute(
             settings: Settings
-          )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+          )(implicit
+            request: Request[_],
+            ec: ExecutionContext,
+            formBinding: FormBinding
+          ): Future[Result] =
             wrap { resolve =>
               implicit val rc: RequestContext = JourneyController.this.context(request)
               JourneyController.this.helpers.bindFormDerivedFromState(
@@ -1473,7 +1666,11 @@ trait JourneyController[RequestContext] {
         ) extends Executable {
           override def execute(
             settings: Settings
-          )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+          )(implicit
+            request: Request[_],
+            ec: ExecutionContext,
+            formBinding: FormBinding
+          ): Future[Result] =
             wrap { resolve =>
               implicit val rc: RequestContext = JourneyController.this.context(request)
               JourneyController.this.helpers.bindFormDerivedFromState(
@@ -1519,7 +1716,8 @@ trait JourneyController[RequestContext] {
             settings: Settings
           )(implicit
             request: Request[_],
-            ec: ExecutionContext
+            ec: ExecutionContext,
+            formBinding: FormBinding
           ): Future[Result] =
             wrap { resolve =>
               implicit val rc: RequestContext = JourneyController.this.context(request)
@@ -1547,7 +1745,8 @@ trait JourneyController[RequestContext] {
             settings: Settings
           )(implicit
             request: Request[_],
-            ec: ExecutionContext
+            ec: ExecutionContext,
+            formBinding: FormBinding
           ): Future[Result] =
             wrap { resolve =>
               implicit val rc: RequestContext = JourneyController.this.context(request)
@@ -1604,7 +1803,11 @@ trait JourneyController[RequestContext] {
           extends Executable {
         override def execute(
           settings: Settings
-        )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+        )(implicit
+          request: Request[_],
+          ec: ExecutionContext,
+          formBinding: FormBinding
+        ): Future[Result] =
           wrap { resolve =>
             waitForUsing(
               _ => Future.failed(new TimeoutException),
@@ -1642,7 +1845,8 @@ trait JourneyController[RequestContext] {
             settings: Settings
           )(implicit
             request: Request[_],
-            ec: ExecutionContext
+            ec: ExecutionContext,
+            formBinding: FormBinding
           ): Future[Result] =
             wrap { resolve =>
               waitForUsing(
@@ -1675,7 +1879,8 @@ trait JourneyController[RequestContext] {
             settings: Settings
           )(implicit
             request: Request[_],
-            ec: ExecutionContext
+            ec: ExecutionContext,
+            formBinding: FormBinding
           ): Future[Result] =
             wrap { resolve =>
               waitForUsing(
@@ -1791,7 +1996,11 @@ trait JourneyController[RequestContext] {
 
       final def wrap(
         body: Resolver => Future[Result]
-      )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+      )(implicit
+        request: Request[_],
+        ec: ExecutionContext,
+        formBinding: FormBinding
+      ): Future[Result] =
         get(request).flatMap { arg =>
           body(new SingleArgumentResolver(arg))
         }
@@ -1807,7 +2016,11 @@ trait JourneyController[RequestContext] {
 
       final def wrap(
         body: Resolver => Future[Result]
-      )(implicit request: Request[_], ec: ExecutionContext): Future[Result] =
+      )(implicit
+        request: Request[_],
+        ec: ExecutionContext,
+        formBinding: FormBinding
+      ): Future[Result] =
         outer.wrap { resolverA =>
           resolverA(get, request).flatMap {
             case (a, b) =>
@@ -1896,7 +2109,12 @@ trait JourneyController[RequestContext] {
       withAuthorised: WithAuthorised[User]
     )(form: Form[Payload])(
       transition: User => Payload => Transition
-    )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
+    )(implicit
+      rc: RequestContext,
+      request: Request[_],
+      ec: ExecutionContext,
+      formBinding: FormBinding
+    ): Future[Result] =
       withAuthorised(request) { user: User =>
         helpers.bindForm(form, transition(user))
       }
@@ -1909,7 +2127,12 @@ trait JourneyController[RequestContext] {
       bootstrap: Transition
     )(withAuthorised: WithAuthorised[User])(form: Form[Payload])(
       transition: User => Payload => Transition
-    )(implicit rc: RequestContext, request: Request[_], ec: ExecutionContext): Future[Result] =
+    )(implicit
+      rc: RequestContext,
+      request: Request[_],
+      ec: ExecutionContext,
+      formBinding: FormBinding
+    ): Future[Result] =
       withAuthorised(request) { user: User =>
         journeyService
           .apply(bootstrap)
