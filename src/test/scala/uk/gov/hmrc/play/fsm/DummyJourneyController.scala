@@ -30,7 +30,8 @@ import akka.actor.ActorSystem
 @Singleton
 class DummyJourneyController @Inject() (
   override val journeyService: DummyJourneyService,
-  override val actionBuilder: DefaultActionBuilder
+  override val actionBuilder: DefaultActionBuilder,
+  override val controllerComponents: ControllerComponents
 )(implicit
   ec: ExecutionContext,
   actorSystem: ActorSystem
@@ -326,13 +327,13 @@ class DummyJourneyController @Inject() (
     actions
       .whenAuthorisedWithRetrievals(asUser)
       .applyWithRequest(_ => Transitions.stop)
-      .redirectOrDisplayUsingIf[State.Stop](implicit request => renderState2)
+      .redirectOrDisplayUsingIf[State.Stop](renderers.renderState2)
 
   val stopDsl9ua: Action[AnyContent] =
     actions
       .whenAuthorisedWithRetrievals(asUser)
       .applyWithRequest(_ => Transitions.stop)
-      .redirectOrDisplayAsyncUsingIf[State.Stop](implicit request => renderStateAsync2)
+      .redirectOrDisplayAsyncUsingIf[State.Stop](renderers.renderStateAsync2)
 
   val stopDsl10: Action[AnyContent] =
     actions
@@ -431,7 +432,7 @@ class DummyJourneyController @Inject() (
       .whenAuthorisedWithRetrievals(asUser)
       .parseJsonWithFallback[TestPayload](ifFailure = BadRequest)
       .apply(user => Transitions.processPayload)
-      .displayUsing(implicit request => renderState2)
+      .displayUsing(renderers.renderState2)
       .recover { case _ => BadRequest }
       .transform { case BadRequest => NotFound }
 
@@ -440,7 +441,7 @@ class DummyJourneyController @Inject() (
       .whenAuthorisedWithRetrievals(asUser)
       .parseJsonWithFallback[TestPayload](ifFailure = BadRequest)
       .apply(user => Transitions.processPayload)
-      .displayAsyncUsing(implicit request => renderStateAsync2)
+      .displayAsyncUsing(renderers.renderStateAsync2)
       .recover { case _ => BadRequest }
       .transform { case BadRequest => NotFound }
 
@@ -452,12 +453,12 @@ class DummyJourneyController @Inject() (
   val wait1_1: Action[AnyContent] =
     actions
       .whenAuthorisedWithRetrievals(asUser)
-      .waitForStateAndDisplayUsing[State.Continue](3, implicit request => renderState2)
+      .waitForStateAndDisplayUsing[State.Continue](3, renderers.renderState2)
 
   val wait1_1a: Action[AnyContent] =
     actions
       .whenAuthorisedWithRetrievals(asUser)
-      .waitForStateAndDisplayAsyncUsing[State.Continue](3, implicit request => renderStateAsync2)
+      .waitForStateAndDisplayAsyncUsing[State.Continue](3, renderers.renderStateAsync2)
 
   val wait2: Action[AnyContent] =
     actions
@@ -513,14 +514,14 @@ class DummyJourneyController @Inject() (
       .whenAuthorisedWithRetrievals(asUser)
       .waitForStateThenRedirect[State.Continue](3)
       .orApplyOnTimeout(Transitions.showContinue)
-      .redirectOrDisplayUsingIf[State.Continue](implicit request => renderState2)
+      .redirectOrDisplayUsingIf[State.Continue](renderers.renderState2)
 
   val wait8ua: Action[AnyContent] =
     actions
       .whenAuthorisedWithRetrievals(asUser)
       .waitForStateThenRedirect[State.Continue](3)
       .orApplyOnTimeout(Transitions.showContinue)
-      .redirectOrDisplayAsyncUsingIf[State.Continue](implicit request => renderStateAsync2)
+      .redirectOrDisplayAsyncUsingIf[State.Continue](renderers.renderStateAsync2)
 
   val wait11: Action[AnyContent] =
     actions
@@ -528,7 +529,7 @@ class DummyJourneyController @Inject() (
 
   val wait11_1: Action[AnyContent] =
     actions
-      .waitForStateAndDisplayUsing[State.Continue](3, implicit request => renderState2)
+      .waitForStateAndDisplayUsing[State.Continue](3, renderers.renderState2)
 
   val wait12: Action[AnyContent] =
     actions
@@ -571,11 +572,11 @@ class DummyJourneyController @Inject() (
 
   val current2: Action[AnyContent] =
     actions.showCurrentState
-      .displayUsing(implicit request => renderState2)
+      .displayUsing(renderers.renderState2)
 
   val current2a: Action[AnyContent] =
     actions.showCurrentState
-      .displayAsyncUsing(implicit request => renderStateAsync2)
+      .displayAsyncUsing(renderers.renderStateAsync2)
 
   val current3: Action[AnyContent] =
     actions
@@ -586,7 +587,7 @@ class DummyJourneyController @Inject() (
     actions
       .whenAuthorisedWithRetrievals(asUser)
       .showCurrentState
-      .displayUsing(implicit request => renderState2)
+      .displayUsing(renderers.renderState2)
 
   def backlink1(implicit request: Request[_]) =
     backLinkToMostRecent[State.Continue](
@@ -628,29 +629,82 @@ class DummyJourneyController @Inject() (
       case State.DeadEnd(result) => Ok(s"Dead end: $result")
     }
 
-  def renderState2(
-    state: journeyService.model.State,
-    breadcrumbs: List[journeyService.model.State],
-    formWithErrors: Option[Form[_]]
-  )(implicit request: Request[_]): Result =
-    state match {
-      case State.Start           => Ok("Start")
-      case State.Continue(arg)   => Created("Continue")
-      case State.Stop(result)    => Accepted("Stop")
-      case State.DeadEnd(result) => NotFound("DeadEnd")
-    }
+  object renderers {
 
-  def renderStateAsync2(
-    state: journeyService.model.State,
-    breadcrumbs: List[journeyService.model.State],
-    formWithErrors: Option[Form[_]]
-  )(implicit request: Request[_]): Future[Result] =
-    Future.successful(state match {
-      case State.Start           => Ok("Start")
-      case State.Continue(arg)   => Created("Continue")
-      case State.Stop(result)    => Accepted("Stop")
-      case State.DeadEnd(result) => NotFound("DeadEnd")
-    })
+    val renderState2 =
+      Renderer.simple {
+        case State.Start           => Ok("Start")
+        case State.Continue(arg)   => Created("Continue")
+        case State.Stop(result)    => Accepted("Stop")
+        case State.DeadEnd(result) => NotFound("DeadEnd")
+      }
+
+    val renderStateAsync2 =
+      AsyncRenderer.simple {
+        case State.Start           => Future.successful(Ok("Start"))
+        case State.Continue(arg)   => Future.successful(Created("Continue"))
+        case State.Stop(result)    => Future.successful(Accepted("Stop"))
+        case State.DeadEnd(result) => Future.successful(NotFound("DeadEnd"))
+      }
+
+    val renderState2a =
+      Renderer.withRequest(request => {
+        case State.Start           => Ok("Start")
+        case State.Continue(arg)   => Created("Continue")
+        case State.Stop(result)    => Accepted("Stop")
+        case State.DeadEnd(result) => NotFound("DeadEnd")
+      })
+
+    val renderState2b =
+      Renderer.withRequestAndForm(request =>
+        form => {
+          case State.Start           => Ok("Start")
+          case State.Continue(arg)   => Created("Continue")
+          case State.Stop(result)    => Accepted("Stop")
+          case State.DeadEnd(result) => NotFound("DeadEnd")
+        }
+      )
+
+    val renderState2c =
+      Renderer(request =>
+        breadcrumbs =>
+          form => {
+            case State.Start           => Ok("Start")
+            case State.Continue(arg)   => Created("Continue")
+            case State.Stop(result)    => Accepted("Stop")
+            case State.DeadEnd(result) => NotFound("DeadEnd")
+          }
+      )
+
+    val renderStateAsync2a =
+      AsyncRenderer.withRequest(request => {
+        case State.Start           => Future.successful(Ok("Start"))
+        case State.Continue(arg)   => Future.successful(Created("Continue"))
+        case State.Stop(result)    => Future.successful(Accepted("Stop"))
+        case State.DeadEnd(result) => Future.successful(NotFound("DeadEnd"))
+      })
+
+    val renderStateAsync2b =
+      AsyncRenderer.withRequestAndForm(request =>
+        form => {
+          case State.Start           => Future.successful(Ok("Start"))
+          case State.Continue(arg)   => Future.successful(Created("Continue"))
+          case State.Stop(result)    => Future.successful(Accepted("Stop"))
+          case State.DeadEnd(result) => Future.successful(NotFound("DeadEnd"))
+        }
+      )
+
+    val renderStateAsync2c =
+      AsyncRenderer(request =>
+        breadcrumbs =>
+          form => {
+            case State.Start           => Future.successful(Ok("Start"))
+            case State.Continue(arg)   => Future.successful(Created("Continue"))
+            case State.Stop(result)    => Future.successful(Accepted("Stop"))
+            case State.DeadEnd(result) => Future.successful(NotFound("DeadEnd"))
+          }
+      )
+  }
 }
 
 object DummyJourneyController {
