@@ -96,19 +96,19 @@ trait JourneyController[RequestContext] {
   type WithAuthorised[User] = Request[_] => (User => Future[Result]) => Future[Result]
 
   object Renderer {
-    def simple(f: PartialFunction[State, Result]): Renderer = {
+    final def simple(f: PartialFunction[State, Result]): Renderer = {
       (request: Request[_]) =>
         (state: State, breadcrumbs: Breadcrumbs, formWithErrors: Option[Form[_]]) =>
-          f(state)
+          f.applyOrElse(state, (_: State) => play.api.mvc.Results.NotImplemented)
     }
 
-    def withRequest(f: Request[_] => PartialFunction[State, Result]): Renderer = {
+    final def withRequest(f: Request[_] => PartialFunction[State, Result]): Renderer = {
       (request: Request[_]) =>
         (state: State, breadcrumbs: Breadcrumbs, formWithErrors: Option[Form[_]]) =>
-          f(request)(state)
+          f(request).applyOrElse(state, (_: State) => play.api.mvc.Results.NotImplemented)
     }
 
-    def withRequestAndForm(
+    final def withRequestAndForm(
       f: Request[_] => Option[Form[_]] => PartialFunction[State, Result]
     ): Renderer = {
       (request: Request[_]) =>
@@ -116,7 +116,7 @@ trait JourneyController[RequestContext] {
           f(request)(formWithErrors)(state)
     }
 
-    def apply(
+    final def apply(
       f: Request[_] => Breadcrumbs => Option[Form[_]] => PartialFunction[State, Result]
     ): Renderer = {
       (request: Request[_]) =>
@@ -126,19 +126,21 @@ trait JourneyController[RequestContext] {
   }
 
   object AsyncRenderer {
-    def simple(f: PartialFunction[State, Future[Result]]): AsyncRenderer = {
+    final def simple(f: PartialFunction[State, Future[Result]]): AsyncRenderer = {
       (request: Request[_]) =>
         (state: State, breadcrumbs: Breadcrumbs, formWithErrors: Option[Form[_]]) =>
           f(state)
     }
 
-    def withRequest(f: Request[_] => PartialFunction[State, Future[Result]]): AsyncRenderer = {
+    final def withRequest(
+      f: Request[_] => PartialFunction[State, Future[Result]]
+    ): AsyncRenderer = {
       (request: Request[_]) =>
         (state: State, breadcrumbs: Breadcrumbs, formWithErrors: Option[Form[_]]) =>
           f(request)(state)
     }
 
-    def withRequestAndForm(
+    final def withRequestAndForm(
       f: Request[_] => Option[Form[_]] => PartialFunction[State, Future[Result]]
     ): AsyncRenderer = {
       (request: Request[_]) =>
@@ -146,7 +148,7 @@ trait JourneyController[RequestContext] {
           f(request)(formWithErrors)(state)
     }
 
-    def apply(
+    final def apply(
       f: Request[_] => Breadcrumbs => Option[Form[_]] => PartialFunction[State, Future[Result]]
     ): AsyncRenderer = {
       (request: Request[_]) =>
@@ -767,23 +769,7 @@ trait JourneyController[RequestContext] {
     }
 
     /**
-      * Interface of the action building blocks.
-      *
-      * Provides common post-processing functions:
-      *
-      * - [[display]] to force display
-      * - [[displayUsing]] to force display using custom renderer
-      * - [[redirect]] to force redirect
-      * - [[redirectOrDisplayIfSame]] to display if state didn't change, otherwise redirect
-      * - [[redirectOrDisplayUsingIfSame]] to display using custom renderer if state didn't change, otherwise redirect
-      * - [[redirectOrDisplayIf]] to display if state of some type, otherwise redirect
-      * - [[redirectOrDisplayUsingIf]] to display using custom renderer if state of some type, otherwise redirect
-      * - [[displayOrRedirectIf]] to redirect if state of some type, otherwise display
-      * - [[displayUsingOrRedirectIf]] to redirect if state of some type, otherwise display using custom renderer
-      * - [[andCleanBreadcrumbs]] to clean history (breadcrumbs)
-      * - [[transform]] to transform final result
-      * - [[recover]] to recover from an error using custom strategy
-      * - [[recoverWith]] to recover from an error using custom strategy
+      * Interface of the action body.
       */
     sealed trait Executable {
 
@@ -798,48 +784,30 @@ trait JourneyController[RequestContext] {
         ec: ExecutionContext,
         formBinding: FormBinding
       ): Future[Result]
+    }
 
-      /**
-        * Run a task and continue if success.
-        * Result of the task is forgotten.
-        * If task fails and fallback [[optionalResultIfFailure]] is defined,
-        * then return success with fallback result,
-        * otherwise propagate the failure.
-        *
-        * @param task asynchronous task to run
-        */
-      def thenRunTask[T](
-        task: Request[_] => Future[T],
-        optionalResultIfFailure: Option[Result] = None
-      ): Executable = {
-        val outer = this
-        new Executable {
-          def execute(
-            settings: Settings
-          )(implicit
-            request: Request[_],
-            ec: ExecutionContext,
-            formBinding: FormBinding
-          ): Future[Result] =
-            outer
-              .execute(settings)
-              .flatMap(result => task(request).map(_ => result))
-              .recoverWith {
-                case e =>
-                  optionalResultIfFailure
-                    .map(Future.successful)
-                    .getOrElse(Future.failed(e))
-              }
-        }
-      }
+    /**
+      * An [[Executable]] with common behaviour modifications functions:
+      *
+      * - [[display]] to force display
+      * - [[displayUsing]] to force display using custom renderer
+      * - [[redirect]] to force redirect
+      * - [[redirectOrDisplayIfSame]] to display if state didn't change, otherwise redirect
+      * - [[redirectOrDisplayUsingIfSame]] to display using custom renderer if state didn't change, otherwise redirect
+      * - [[redirectOrDisplayIf]] to display if state of some type, otherwise redirect
+      * - [[redirectOrDisplayUsingIf]] to display using custom renderer if state of some type, otherwise redirect
+      * - [[displayOrRedirectIf]] to redirect if state of some type, otherwise display
+      * - [[displayUsingOrRedirectIf]] to redirect if state of some type, otherwise display using custom renderer
+      */
+    sealed trait ExecutableWithDisplayOverrides extends ExecutableWithFinalTasks {
 
       /**
         * Change how the result is created.
         * Force displaying the state after action using [[renderState]].
         */
-      final def display: Executable = {
+      final def display: ExecutableWithFinalTasks = {
         val outer = this
-        new Executable {
+        new ExecutableWithFinalTasks {
           def execute(
             settings: Settings
           )(implicit
@@ -855,9 +823,9 @@ trait JourneyController[RequestContext] {
         * Change how the result is created.
         * Force displaying the state after action using custom renderer.
         */
-      final def displayUsing(renderState: Renderer): Executable = {
+      final def displayUsing(renderState: Renderer): ExecutableWithFinalTasks = {
         val outer = this
-        new Executable {
+        new ExecutableWithFinalTasks {
           def execute(
             settings: Settings
           )(implicit
@@ -875,9 +843,9 @@ trait JourneyController[RequestContext] {
         * Change how the result is created.
         * Force displaying the state after action using custom asynchronous renderer.
         */
-      final def displayAsyncUsing(renderState: AsyncRenderer): Executable = {
+      final def displayAsyncUsing(renderState: AsyncRenderer): ExecutableWithFinalTasks = {
         val outer = this
-        new Executable {
+        new ExecutableWithFinalTasks {
           def execute(
             settings: Settings
           )(implicit
@@ -897,9 +865,9 @@ trait JourneyController[RequestContext] {
         * Change how the result is created.
         * Force redirect to the state after action using URL returned by [[getCallFor]].
         */
-      final def redirect: Executable = {
+      final def redirect: ExecutableWithFinalTasks = {
         val outer = this
-        new Executable {
+        new ExecutableWithFinalTasks {
           def execute(
             settings: Settings
           )(implicit
@@ -916,9 +884,9 @@ trait JourneyController[RequestContext] {
         * If the state after action didn't change then display using [[renderState]],
         * otherwise redirect using URL returned by [[getCallFor]].
         */
-      final def redirectOrDisplayIfSame: Executable = {
+      final def redirectOrDisplayIfSame: ExecutableWithFinalTasks = {
         val outer = this
-        new Executable {
+        new ExecutableWithFinalTasks {
           def execute(
             settings: Settings
           )(implicit
@@ -944,9 +912,9 @@ trait JourneyController[RequestContext] {
         * If the state after action didn't change then display using custom renderer,
         * otherwise redirect using URL returned by [[getCallFor]].
         */
-      final def redirectOrDisplayUsingIfSame(renderState: Renderer): Executable = {
+      final def redirectOrDisplayUsingIfSame(renderState: Renderer): ExecutableWithFinalTasks = {
         val outer = this
-        new Executable {
+        new ExecutableWithFinalTasks {
           def execute(
             settings: Settings
           )(implicit
@@ -972,9 +940,11 @@ trait JourneyController[RequestContext] {
         * If the state after action didn't change then display using custom asynchronous renderer,
         * otherwise redirect using URL returned by [[getCallFor]].
         */
-      final def redirectOrDisplayAsyncUsingIfSame(renderState: AsyncRenderer): Executable = {
+      final def redirectOrDisplayAsyncUsingIfSame(
+        renderState: AsyncRenderer
+      ): ExecutableWithFinalTasks = {
         val outer = this
-        new Executable {
+        new ExecutableWithFinalTasks {
           def execute(
             settings: Settings
           )(implicit
@@ -1001,10 +971,10 @@ trait JourneyController[RequestContext] {
         * If the state after action is of type S then display using [[renderState]],
         * otherwise redirect using URL returned by [[getCallFor]].
         */
-      final def redirectOrDisplayIf[S <: State: ClassTag]: Executable = {
+      final def redirectOrDisplayIf[S <: State: ClassTag]: ExecutableWithFinalTasks = {
         val outer                          = this
         val outcomeFactory: OutcomeFactory = JourneyController.this.helpers.redirectOrDisplayIf[S]
-        new Executable {
+        new ExecutableWithFinalTasks {
           def execute(
             settings: Settings
           )(implicit
@@ -1023,11 +993,11 @@ trait JourneyController[RequestContext] {
         */
       final def redirectOrDisplayUsingIf[S <: State: ClassTag](
         renderState: Renderer
-      ): Executable = {
+      ): ExecutableWithFinalTasks = {
         val outer = this
         val outcomeFactory: OutcomeFactory =
           JourneyController.this.helpers.redirectOrDisplayUsingIf[S](renderState)
-        new Executable {
+        new ExecutableWithFinalTasks {
           def execute(
             settings: Settings
           )(implicit
@@ -1046,11 +1016,11 @@ trait JourneyController[RequestContext] {
         */
       final def redirectOrDisplayAsyncUsingIf[S <: State: ClassTag](
         renderState: AsyncRenderer
-      ): Executable = {
+      ): ExecutableWithFinalTasks = {
         val outer = this
         val outcomeFactory: OutcomeFactory =
           JourneyController.this.helpers.redirectOrDisplayAsyncUsingIf[S](renderState)
-        new Executable {
+        new ExecutableWithFinalTasks {
           def execute(
             settings: Settings
           )(implicit
@@ -1067,10 +1037,10 @@ trait JourneyController[RequestContext] {
         * If the state after action is of type S then redirect using URL returned by [[getCallFor]]
         * otherwise display using [[renderState]],.
         */
-      final def displayOrRedirectIf[S <: State: ClassTag]: Executable = {
+      final def displayOrRedirectIf[S <: State: ClassTag]: ExecutableWithFinalTasks = {
         val outer                          = this
         val outcomeFactory: OutcomeFactory = JourneyController.this.helpers.displayOrRedirectIf[S]
-        new Executable {
+        new ExecutableWithFinalTasks {
           def execute(
             settings: Settings
           )(implicit
@@ -1089,11 +1059,11 @@ trait JourneyController[RequestContext] {
         */
       final def displayUsingOrRedirectIf[S <: State: ClassTag](
         renderState: Renderer
-      ): Executable = {
+      ): ExecutableWithFinalTasks = {
         val outer = this
         val outcomeFactory: OutcomeFactory =
           JourneyController.this.helpers.displayUsingOrRedirectIf[S](renderState)
-        new Executable {
+        new ExecutableWithFinalTasks {
           def execute(
             settings: Settings
           )(implicit
@@ -1112,11 +1082,11 @@ trait JourneyController[RequestContext] {
         */
       final def displayAsyncUsingOrRedirectIf[S <: State: ClassTag](
         renderState: AsyncRenderer
-      ): Executable = {
+      ): ExecutableWithFinalTasks = {
         val outer = this
         val outcomeFactory: OutcomeFactory =
           JourneyController.this.helpers.displayAsyncUsingOrRedirectIf[S](renderState)
-        new Executable {
+        new ExecutableWithFinalTasks {
           def execute(
             settings: Settings
           )(implicit
@@ -1127,11 +1097,56 @@ trait JourneyController[RequestContext] {
             outer.execute(settings.setOutcomeFactory(outcomeFactory))
         }
       }
+    }
+
+    /**
+      * An [[Executable]] with common functions:
+      *
+      * - [[andCleanBreadcrumbs]] to clean history (breadcrumbs)
+      * - [[transform]] to transform final result
+      * - [[recover]] to recover from an error using custom strategy
+      * - [[recoverWith]] to recover from an error using custom strategy
+      */
+    sealed trait ExecutableWithFinalTasks extends Executable {
+
+      /**
+        * Run a task and continue if success.
+        * Result of the task is forgotten.
+        * If task fails and fallback [[optionalResultIfFailure]] is defined,
+        * then return success with fallback result,
+        * otherwise propagate the failure.
+        *
+        * @param task asynchronous task to run
+        */
+      def thenRunTask[T](
+        task: Request[_] => Future[T],
+        optionalResultIfFailure: Option[Result] = None
+      ): ExecutableWithFinalTasks = {
+        val outer = this
+        new ExecutableWithFinalTasks {
+          def execute(
+            settings: Settings
+          )(implicit
+            request: Request[_],
+            ec: ExecutionContext,
+            formBinding: FormBinding
+          ): Future[Result] =
+            outer
+              .execute(settings)
+              .flatMap(result => task(request).map(_ => result))
+              .recoverWith {
+                case e =>
+                  optionalResultIfFailure
+                    .map(Future.successful)
+                    .getOrElse(Future.failed(e))
+              }
+        }
+      }
 
       /** Clean history (breadcrumbs) after an action. */
-      final def andCleanBreadcrumbs(): Executable = {
+      final def andCleanBreadcrumbs(): ExecutableWithFinalTasks = {
         val outer = this
-        new Executable {
+        new ExecutableWithFinalTasks {
           def execute(
             settings: Settings
           )(implicit
@@ -1149,9 +1164,9 @@ trait JourneyController[RequestContext] {
       }
 
       /** Transform result using provided partial function. */
-      final def transform(fx: PartialFunction[Result, Result]): Executable = {
+      final def transform(fx: PartialFunction[Result, Result]): ExecutableWithFinalTasks = {
         val outer = this
-        new Executable {
+        new ExecutableWithFinalTasks {
           def execute(
             settings: Settings
           )(implicit
@@ -1168,9 +1183,9 @@ trait JourneyController[RequestContext] {
       /** Recover from an error using custom strategy. */
       final def recover(
         recoveryStrategy: PartialFunction[Throwable, Result]
-      ): Executable = {
+      ): ExecutableWithFinalTasks = {
         val outer = this
-        new Executable {
+        new ExecutableWithFinalTasks {
           def execute(
             settings: Settings
           )(implicit
@@ -1185,9 +1200,9 @@ trait JourneyController[RequestContext] {
       /** Recover from an error using custom strategy. */
       final def recoverWith(
         recoveryStrategy: Request[_] => PartialFunction[Throwable, Future[Result]]
-      ): Executable = {
+      ): ExecutableWithFinalTasks = {
         val outer = this
-        new Executable {
+        new ExecutableWithFinalTasks {
           def execute(
             settings: Settings
           )(implicit
@@ -1274,9 +1289,9 @@ trait JourneyController[RequestContext] {
         * If there is no state yet then redirects to the start.
         * @note follow with [[renderUsing]] to change the default renderer.
         */
-      final val showCurrentState: Executable = new ShowCurrentState()
+      final val showCurrentState: ExecutableWithDisplayOverrides = new ShowCurrentState()
 
-      final class ShowCurrentState private[fsm] () extends Executable {
+      final class ShowCurrentState private[fsm] () extends ExecutableWithDisplayOverrides {
         override def execute(
           settings: Settings
         )(implicit
@@ -1314,21 +1329,33 @@ trait JourneyController[RequestContext] {
         * - [[orReturn]]
         * - [[orRedirectTo]]
         */
-      final def show[S <: State: ClassTag]: Show[S] =
+      final def show[S <: State: ClassTag]
+        : Show[S] with WithRollback[S] with WithApply[S] with WithRedirect[S] =
         new Show[S](
           rollback = false,
           merger = None,
           fallback = JourneyController.this.helpers.defaultShowFallback
-        )
+        ) with WithRollback[S] with WithApply[S] with WithRedirect[S]
 
-      final class Show[S <: State: ClassTag] private[fsm] (
-        rollback: Boolean,
-        merger: Option[Merger[S]],
-        fallback: Fallback
-      ) extends Executable {
+      /** [[Show]] DSL data model. */
+      sealed trait ShowLike[S <: State] {
+        implicit val ct: ClassTag[S]
+        val rollback: Boolean
+        val merger: Option[Merger[S]]
+        val fallback: Fallback
 
-        final val defaultOutcomeFactory: OutcomeFactory =
+        @`inline` final val defaultOutcomeFactory: OutcomeFactory =
           JourneyController.this.helpers.redirectOrDisplayIf[S]
+      }
+
+      /** [[Show]] DSL wrapper. */
+      sealed class Show[S <: State] private[fsm] (
+        val rollback: Boolean,
+        val merger: Option[Merger[S]],
+        val fallback: Fallback
+      )(implicit val ct: ClassTag[S])
+          extends ShowLike[S]
+          with ExecutableWithDisplayOverrides {
 
         override def execute(
           settings: Settings
@@ -1349,6 +1376,10 @@ trait JourneyController[RequestContext] {
                   .showStateWithRollbackUsingMerger[S](m, outcomeFactory, fallback)
             }
           }
+      }
+
+      /** [[Show]] DSL modifications. */
+      sealed trait WithRollback[S <: State] extends ShowLike[S] {
 
         /**
           * Modify [[show]] behaviour:
@@ -1358,8 +1389,10 @@ trait JourneyController[RequestContext] {
           *
           * @note to alter behaviour follow with [[orApply]] or [[orApplyWithRequest]]
           */
-        final def orRollback: Show[S] =
+        @`inline` final def orRollback: Show[S] with WithApply[S] with WithRedirect[S] =
           new Show[S](rollback = true, merger = None, fallback = fallback)
+            with WithApply[S]
+            with WithRedirect[S]
 
         /**
           * Modify [[show]] behaviour:
@@ -1373,8 +1406,16 @@ trait JourneyController[RequestContext] {
           *
           * @note to alter behaviour follow with [[orApply]] or [[orApplyWithRequest]]
           */
-        final def orRollbackUsing(merger: Merger[S]): Show[S] =
+        @`inline` final def orRollbackUsing(
+          merger: Merger[S]
+        ): Show[S] with WithApply[S] with WithRedirect[S] =
           new Show[S](rollback = true, merger = Some(merger), fallback = fallback)
+            with WithApply[S]
+            with WithRedirect[S]
+      }
+
+      /** [[Show]] DSL modifications. */
+      sealed trait WithApply[S <: State] extends ShowLike[S] {
 
         /**
           * Modify [[show]] behaviour:
@@ -1386,9 +1427,10 @@ trait JourneyController[RequestContext] {
           * If transition is not allowed then redirect back to the current state.
           * @tparam S type of the state to display
           */
-        final def orApply(transition: Transition): OrApply = new OrApply(transition)
+        @`inline` final def orApply(transition: Transition): OrApply = new OrApply(transition)
 
-        final class OrApply private[fsm] (transition: Transition) extends Executable {
+        final class OrApply private[fsm] (transition: Transition)
+            extends ExecutableWithDisplayOverrides {
           override def execute(
             settings: Settings
           )(implicit
@@ -1422,11 +1464,13 @@ trait JourneyController[RequestContext] {
           * If transition is not allowed then redirect back to the current state.
           * @tparam S type of the state to display
           */
-        final def orApplyWithRequest(transition: TransitionWithRequest): OrApplyWithRequest =
+        @`inline` final def orApplyWithRequest(
+          transition: TransitionWithRequest
+        ): OrApplyWithRequest =
           new OrApplyWithRequest(transition)
 
         final class OrApplyWithRequest private[fsm] (transition: TransitionWithRequest)
-            extends Executable {
+            extends ExecutableWithDisplayOverrides {
           override def execute(
             settings: Settings
           )(implicit
@@ -1449,13 +1493,17 @@ trait JourneyController[RequestContext] {
               }
             }
         }
+      }
+
+      /** [[Show]] DSL modifications. */
+      sealed trait WithRedirect[S <: State] extends ShowLike[S] {
 
         /**
           * Modify [[show]] behaviour:
           * Redirect to the current state if not S,
           * instead of using the default show fallback.
           */
-        final def orRedirectToCurrentState: Show[S] =
+        @`inline` final def orRedirectToCurrentState: Show[S] =
           new Show[S](
             rollback = rollback,
             merger = merger,
@@ -1467,7 +1515,7 @@ trait JourneyController[RequestContext] {
           * Redirect to the Start state if current state is not of S type,
           * instead of using the default show fallback.
           */
-        final def orRedirectToStart: Show[S] =
+        @`inline` final def orRedirectToStart: Show[S] =
           new Show[S](
             rollback = rollback,
             merger = merger,
@@ -1479,7 +1527,7 @@ trait JourneyController[RequestContext] {
           * Return the given result if current state is not of S type,
           * instead of using the default show fallback.
           */
-        final def orReturn(result: => Result): Show[S] =
+        @`inline` final def orReturn(result: => Result): Show[S] =
           new Show[S](
             rollback = rollback,
             merger = merger,
@@ -1491,7 +1539,7 @@ trait JourneyController[RequestContext] {
           * Redirect to the given call if current state is not of S type,
           * instead of using the default show fallback.
           */
-        final def orRedirectTo(call: Call): Show[S] =
+        @`inline` final def orRedirectTo(call: Call): Show[S] =
           new Show[S](
             rollback = rollback,
             merger = merger,
@@ -1504,9 +1552,10 @@ trait JourneyController[RequestContext] {
         *
         * @note to alter behaviour follow with [[redirectOrDisplayIfSame]] or [[redirectOrDisplayIf]]
         */
-      final def apply(transition: Transition): Apply = new Apply(transition)
+      @`inline` final def apply(transition: Transition): Apply = new Apply(transition)
 
-      final class Apply private[fsm] (transition: Transition) extends Executable {
+      final class Apply private[fsm] (transition: Transition)
+          extends ExecutableWithDisplayOverrides {
         override def execute(
           settings: Settings
         )(implicit
@@ -1525,11 +1574,11 @@ trait JourneyController[RequestContext] {
       }
 
       /** Apply state transition and redirect to the new state. */
-      final def applyWithRequest(transition: TransitionWithRequest): ApplyWithRequest =
+      @`inline` final def applyWithRequest(transition: TransitionWithRequest): ApplyWithRequest =
         new ApplyWithRequest(transition)
 
       final class ApplyWithRequest private[fsm] (transition: TransitionWithRequest)
-          extends Executable {
+          extends ExecutableWithDisplayOverrides {
         override def execute(
           settings: Settings
         )(implicit
@@ -1553,7 +1602,7 @@ trait JourneyController[RequestContext] {
         * if not valid, redirect back to the current state with failed form.
         * @tparam Payload form output type
         */
-      final def bindForm[Payload](form: Form[Payload]): BindForm[Payload] =
+      @`inline` final def bindForm[Payload](form: Form[Payload]): BindForm[Payload] =
         new BindForm[Payload](form)
 
       final class BindForm[Payload] private[fsm] (form: Form[Payload]) {
@@ -1562,9 +1611,11 @@ trait JourneyController[RequestContext] {
           * Apply the state transition parametrized by the form output
           * and redirect to the URL matching the new state.
           */
-        final def apply(transition: TransitionWith[Payload]): Apply = new Apply(transition)
+        @`inline` final def apply(transition: TransitionWith[Payload]): Apply =
+          new Apply(transition)
 
-        final class Apply private[fsm] (transition: TransitionWith[Payload]) extends Executable {
+        final class Apply private[fsm] (transition: TransitionWith[Payload])
+            extends ExecutableWithDisplayOverrides {
           override def execute(
             settings: Settings
           )(implicit
@@ -1587,14 +1638,14 @@ trait JourneyController[RequestContext] {
           * Apply the state transition parametrized by the form output
           * and redirect to the URL matching the new state.
           */
-        final def applyWithRequest(
+        @`inline` final def applyWithRequest(
           transition: TransitionWithRequestAnd[Payload]
         ): ApplyWithRequest =
           new ApplyWithRequest(transition)
 
         final class ApplyWithRequest private[fsm] (
           transition: TransitionWithRequestAnd[Payload]
-        ) extends Executable {
+        ) extends ExecutableWithDisplayOverrides {
           override def execute(
             settings: Settings
           )(implicit
@@ -1620,7 +1671,7 @@ trait JourneyController[RequestContext] {
         * if not valid, redirect back to the current state with failed form.
         * @tparam Payload form output type
         */
-      final def bindFormDerivedFromState[Payload](
+      @`inline` final def bindFormDerivedFromState[Payload](
         form: State => Form[Payload]
       ): BindFormDerivedFromState[Payload] =
         new BindFormDerivedFromState[Payload](form)
@@ -1631,9 +1682,11 @@ trait JourneyController[RequestContext] {
           * Apply the state transition parametrized by the form output
           * and redirect to the URL matching the new state.
           */
-        final def apply(transition: TransitionWith[Payload]): Apply = new Apply(transition)
+        @`inline` final def apply(transition: TransitionWith[Payload]): Apply =
+          new Apply(transition)
 
-        final class Apply private[fsm] (transition: TransitionWith[Payload]) extends Executable {
+        final class Apply private[fsm] (transition: TransitionWith[Payload])
+            extends ExecutableWithDisplayOverrides {
           override def execute(
             settings: Settings
           )(implicit
@@ -1656,14 +1709,14 @@ trait JourneyController[RequestContext] {
           * Apply the state transition parametrized by the form output
           * and redirect to the URL matching the new state.
           */
-        final def applyWithRequest(
+        @`inline` final def applyWithRequest(
           transition: TransitionWithRequestAnd[Payload]
         ): ApplyWithRequest =
           new ApplyWithRequest(transition)
 
         final class ApplyWithRequest private[fsm] (
           transition: TransitionWithRequestAnd[Payload]
-        ) extends Executable {
+        ) extends ExecutableWithDisplayOverrides {
           override def execute(
             settings: Settings
           )(implicit
@@ -1689,7 +1742,7 @@ trait JourneyController[RequestContext] {
         * if not valid, throw an exception.
         * @tparam Entity entity
         */
-      final def parseJson[Entity: Reads]: ParseJson[Entity] =
+      @`inline` final def parseJson[Entity: Reads]: ParseJson[Entity] =
         new ParseJson[Entity](None)
 
       /**
@@ -1698,7 +1751,9 @@ trait JourneyController[RequestContext] {
         * if not valid, return the alternative result.
         * @tparam Entity entity
         */
-      final def parseJsonWithFallback[Entity: Reads](ifFailure: Result): ParseJson[Entity] =
+      @`inline` final def parseJsonWithFallback[Entity: Reads](
+        ifFailure: Result
+      ): ParseJson[Entity] =
         new ParseJson[Entity](Some(ifFailure))
 
       final class ParseJson[Entity: Reads] private[fsm] (
@@ -1709,9 +1764,10 @@ trait JourneyController[RequestContext] {
           * Parse request's body as JSON and apply the state transition if success,
           * otherwise return ifFailure result.
           */
-        final def apply(transition: TransitionWith[Entity]): Apply = new Apply(transition)
+        @`inline` final def apply(transition: TransitionWith[Entity]): Apply = new Apply(transition)
 
-        final class Apply private[fsm] (transition: TransitionWith[Entity]) extends Executable {
+        final class Apply private[fsm] (transition: TransitionWith[Entity])
+            extends ExecutableWithDisplayOverrides {
           override def execute(
             settings: Settings
           )(implicit
@@ -1733,14 +1789,14 @@ trait JourneyController[RequestContext] {
           * Parse request's body as JSON and apply the state transition if success,
           * otherwise return ifFailure result.
           */
-        final def applyWithRequest(
+        @`inline` final def applyWithRequest(
           transition: TransitionWithRequestAnd[Entity]
         ): ApplyWithRequest =
           new ApplyWithRequest(transition)
 
         final class ApplyWithRequest private[fsm] (
           transition: TransitionWithRequestAnd[Entity]
-        ) extends Executable {
+        ) extends ExecutableWithDisplayOverrides {
           override def execute(
             settings: Settings
           )(implicit
@@ -1763,7 +1819,7 @@ trait JourneyController[RequestContext] {
         * Wait until the state becomes of S type and display it using default [[renderState]],
         * or if timeout expires raise a [[java.util.concurrent.TimeoutException]].
         */
-      final def waitForStateAndDisplay[S <: State: ClassTag](
+      @`inline` final def waitForStateAndDisplay[S <: State: ClassTag](
         timeoutInSeconds: Int
       )(implicit scheduler: akka.actor.Scheduler): WaitFor[S] =
         new WaitFor[S](timeoutInSeconds)(JourneyController.this.helpers.display)
@@ -1772,7 +1828,7 @@ trait JourneyController[RequestContext] {
         * Wait until the state becomes of S type and display it using custom renderer,
         * or if timeout expires raise a [[java.util.concurrent.TimeoutException]].
         */
-      final def waitForStateAndDisplayUsing[S <: State: ClassTag](
+      @`inline` final def waitForStateAndDisplayUsing[S <: State: ClassTag](
         timeoutInSeconds: Int,
         renderer: Renderer
       )(implicit scheduler: akka.actor.Scheduler): WaitFor[S] =
@@ -1782,7 +1838,7 @@ trait JourneyController[RequestContext] {
         * Wait until the state becomes of S type and display it using custom renderer,
         * or if timeout expires raise a [[java.util.concurrent.TimeoutException]].
         */
-      final def waitForStateAndDisplayAsyncUsing[S <: State: ClassTag](
+      @`inline` final def waitForStateAndDisplayAsyncUsing[S <: State: ClassTag](
         timeoutInSeconds: Int,
         renderer: AsyncRenderer
       )(implicit scheduler: akka.actor.Scheduler): WaitFor[S] =
@@ -1792,7 +1848,7 @@ trait JourneyController[RequestContext] {
         * Wait until the state becomes of S type and redirect to it,
         * or if timeout expires raise a [[java.util.concurrent.TimeoutException]].
         */
-      final def waitForStateThenRedirect[S <: State: ClassTag](
+      @`inline` final def waitForStateThenRedirect[S <: State: ClassTag](
         timeoutInSeconds: Int
       )(implicit scheduler: akka.actor.Scheduler): WaitFor[S] =
         new WaitFor[S](timeoutInSeconds)(JourneyController.this.helpers.redirect)
@@ -1800,7 +1856,7 @@ trait JourneyController[RequestContext] {
       final class WaitFor[S <: State: ClassTag] private[fsm] (timeoutInSeconds: Int)(
         outcomeFactory: OutcomeFactory
       )(implicit scheduler: akka.actor.Scheduler)
-          extends Executable {
+          extends ExecutableWithDisplayOverrides {
         override def execute(
           settings: Settings
         )(implicit
@@ -1837,10 +1893,11 @@ trait JourneyController[RequestContext] {
           *
           * @note follow with [[display]] or [[redirectOrDisplayIf]] to display instead of redirecting.
           */
-        final def orApplyOnTimeout(transition: Transition): OrApply =
+        @`inline` final def orApplyOnTimeout(transition: Transition): OrApply =
           new OrApply(transition)
 
-        final class OrApply private[fsm] (transition: Transition) extends Executable {
+        final class OrApply private[fsm] (transition: Transition)
+            extends ExecutableWithDisplayOverrides {
           override def execute(
             settings: Settings
           )(implicit
@@ -1868,13 +1925,13 @@ trait JourneyController[RequestContext] {
           *
           * @note follow with [[display]] or [[redirectOrDisplayIf]] to display instead of redirecting.
           */
-        final def orApplyWithRequestOnTimeout(
+        @`inline` final def orApplyWithRequestOnTimeout(
           transition: TransitionWithRequest
         ): OrApplyWithRequest =
           new OrApplyWithRequest(transition)
 
         final class OrApplyWithRequest private[fsm] (transition: TransitionWithRequest)
-            extends Executable {
+            extends ExecutableWithDisplayOverrides {
           override def execute(
             settings: Settings
           )(implicit
