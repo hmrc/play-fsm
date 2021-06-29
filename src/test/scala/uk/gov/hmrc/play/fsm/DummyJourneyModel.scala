@@ -34,6 +34,11 @@ object DummyJourneyModel extends JourneyModel {
 
     val start = DummyJourneyModel.start
 
+    val toStart =
+      Transition {
+        case _ => goto(Start)
+      }
+
     def showContinue(user: Int) =
       Transition {
         case Start      => goto(Continue("yummy"))

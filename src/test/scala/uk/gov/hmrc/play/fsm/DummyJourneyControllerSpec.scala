@@ -171,6 +171,13 @@ class DummyJourneyControllerSpec
       journeyState.get should have[State](State.Start, Nil)
     }
 
+    "given Continue when showStartOrApplyToStart then display Start and drop breadcrumbs head" in {
+      journeyState.set(State.Continue("foo"), List(State.Start, State.Stop("foo")))
+      val result = controller.showStartOrApplyToStart(fakeRequest)
+      status(result) shouldBe 200
+      journeyState.get should have[State](State.Start, List(State.Stop("foo")))
+    }
+
     "given Start when showStartOrRollback then display Start" in {
       journeyState.set(State.Start, Nil)
       val result = controller.showStartOrRollback(fakeRequest)

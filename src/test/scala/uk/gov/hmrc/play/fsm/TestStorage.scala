@@ -27,6 +27,7 @@ trait TestStorage[S] {
 
   def fetch(implicit hc: DummyContext, ec: ExecutionContext): Future[Option[S]] =
     Future.successful(state.get())
+
   def save(newState: S)(implicit hc: DummyContext, ec: ExecutionContext): Future[S] =
     Future {
       state
