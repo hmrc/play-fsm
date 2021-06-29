@@ -70,6 +70,11 @@ class DummyJourneyController @Inject() (
     actions
       .show[State.Start.type]
 
+  val showStartOrApplyToStart: Action[AnyContent] =
+    actions
+      .show[State.Start.type]
+      .orApply(Transitions.toStart)
+
   val showStartAndRunSuccessfulTask: Action[AnyContent] =
     actions
       .show[State.Start.type]

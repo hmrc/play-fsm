@@ -91,6 +91,29 @@ trait PersistentJourneyService[RequestContext] extends JourneyService[RequestCon
     */
   val breadcrumbsRetentionStrategy: Breadcrumbs => Breadcrumbs = identity
 
+  /**
+    * Updates breadcrumbs with the new state.
+    * The default implementation will only update breadcrumbs if the new state is different
+    * from the previous state. In case new state if equal to the before-current state,
+    * the current head of breadcrumbs will be droped to emulate stack-like browser back button behaviour.
+    * The [[breadcrumbsRetentionStrategy]] will apply as well.
+    *
+    * @param newState the result of the transition
+    * @param currentState
+    * @param currentBreadcrumbs
+    * @return updated breadcrumbs
+    */
+  def updateBreadcrumbs(
+    newState: model.State,
+    currentState: model.State,
+    currentBreadcrumbs: Breadcrumbs
+  ): Breadcrumbs =
+    if (newState == currentState)
+      currentBreadcrumbs
+    else if (currentBreadcrumbs.nonEmpty && currentBreadcrumbs.head == newState)
+      currentBreadcrumbs.tail
+    else currentState :: breadcrumbsRetentionStrategy(currentBreadcrumbs)
+
   override def apply(
     transition: model.Transition
   )(implicit rc: RequestContext, ec: ExecutionContext): Future[StateAndBreadcrumbs] =
@@ -105,8 +128,7 @@ trait PersistentJourneyService[RequestContext] extends JourneyService[RequestCon
           save(
             (
               endState,
-              if (endState == state) breadcrumbs
-              else state :: breadcrumbsRetentionStrategy(breadcrumbs)
+              updateBreadcrumbs(endState, state, breadcrumbs)
             )
           )
         }
