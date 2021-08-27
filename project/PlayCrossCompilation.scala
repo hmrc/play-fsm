@@ -1,7 +1,7 @@
 import uk.gov.hmrc.playcrosscompilation.AbstractPlayCrossCompilation
 import uk.gov.hmrc.playcrosscompilation.PlayVersion.{Play26, Play27, Play28}
 
-object PlayCrossCompilation extends AbstractPlayCrossCompilation(defaultPlayVersion = Play27) {
+object PlayCrossCompilation extends AbstractPlayCrossCompilation(defaultPlayVersion = Play28) {
 
   override lazy val playDir = playVersion match {
     case Play26 => "play-26"

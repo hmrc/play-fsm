@@ -15,39 +15,12 @@
  */
 
 package uk.gov.hmrc.play.fsm
-import DummyJourneyModel.{Merger, Mergers, State, Transition, TransitionNotAllowed, Transitions}
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.reflect.ClassTag
-import scala.util.Try
+class DummyJourneyModelSpec extends UnitSpec with JourneyModelSpec {
 
-class DummyJourneyModelSpec extends UnitSpec with StateMatchers[State] {
+  override val model = DummyJourneyModel
 
-  implicit val context: DummyContext = DummyContext()
-
-  case class given[S <: State: ClassTag](initialState: S) extends DummyJourneyService {
-    Option(initialState) match {
-      case Some(state) => await(save((state, Nil)))
-      case None        => ()
-    }
-
-    def withBreadcrumbs(breadcrumbs: State*): this.type = {
-      await(for {
-        Some((s, _)) <- fetch
-        _            <- save((s, breadcrumbs.toList))
-      } yield ())
-      this
-    }
-
-    def when(transition: Transition): (State, List[State]) =
-      await(super.apply(transition).recover { case TransitionNotAllowed(s, b, _) => (s, b) })
-
-    def shouldFailWhen(transition: Transition) =
-      Try(await(super.apply(transition))).isSuccess shouldBe false
-
-    def when(merger: Merger[S], state: State): (State, List[State]) =
-      await(super.modify { s: S => merger.apply((s, state)) })
-  }
+  import model.{Mergers, State, Transitions}
 
   "DummyJourneyModel" when {
     "in an undefined state" should {
