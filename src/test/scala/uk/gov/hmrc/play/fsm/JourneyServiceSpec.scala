@@ -22,11 +22,12 @@ class JourneyServiceSpec extends UnitSpec {
 
   implicit val context = DummyContext()
 
-  val testService = new PersistentJourneyService[DummyContext]
-    with TestStorage[(String, List[String])] {
-    override val journeyKey: String                                       = "TestJourney"
-    override val model                                                    = new TestJourneyModel
-    override val breadcrumbsRetentionStrategy: Breadcrumbs => Breadcrumbs = _.take(9)
+  val testService = new TestJourneyService {
+    override val model =
+      new TestJourneyModel
+
+    override val breadcrumbsRetentionStrategy: Breadcrumbs => Breadcrumbs =
+      _.take(9)
   }
 
   "PersistentJourneyService" should {

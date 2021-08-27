@@ -19,7 +19,7 @@ lazy val library = Project(libName, file("."))
   .enablePlugins(play.sbt.PlayScala, SbtAutoBuildPlugin, SbtGitVersioning)
   .disablePlugins(PlayLayoutPlugin)
   .settings(
-    makePublicallyAvailableOnBintray := true,
+    isPublicArtefact := true,
     majorVersion := 0
   )
   .settings(
@@ -46,10 +46,6 @@ lazy val library = Project(libName, file("."))
       )
     ),
     crossScalaVersions := List("2.12.12"),
-    resolvers := Seq(
-      Resolver.bintrayRepo("hmrc", "releases"),
-      "typesafe-releases" at "https://repo.typesafe.com/typesafe/releases/"
-    ),
     dependencyOverrides += "com.typesafe.play" %% "twirl-api" % "1.4.2",
     playCrossCompilationSettings,
     scalafmtOnCompile in Compile := true,
