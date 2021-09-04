@@ -142,7 +142,14 @@ trait JourneyModelSpec extends TestJourneyService[DummyContext] {
             MatchResult(false, s"Transition has been expected but got an exception $exception", s"")
 
           case When(_, Right((thisState, _))) if state != thisState =>
-            MatchResult(false, s"State $state has been expected but got state $thisState", s"")
+            if (state != result.initialState && thisState == result.initialState)
+              MatchResult(
+                false,
+                s"New state $state has been expected but the transition didn't happen.",
+                s""
+              )
+            else
+              MatchResult(false, s"State $state has been expected but got state $thisState", s"")
 
           case _ =>
             MatchResult(true, "", s"")
