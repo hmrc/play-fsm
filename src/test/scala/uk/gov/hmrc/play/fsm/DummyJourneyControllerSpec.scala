@@ -46,8 +46,6 @@ class DummyJourneyControllerSpec
 
   implicit lazy val materializer: Materializer = app.materializer
 
-  implicit val context: DummyContext = DummyContext()
-
   override lazy val app: Application =
     new GuiceApplicationBuilder().build()
 

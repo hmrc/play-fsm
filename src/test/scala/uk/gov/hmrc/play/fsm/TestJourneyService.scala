@@ -21,37 +21,37 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 
-trait TestJourneyService extends PersistentJourneyService[DummyContext] {
+trait TestJourneyService[RequestContext] extends PersistentJourneyService[RequestContext] {
 
   override val journeyKey: String = "TestJourney"
 
-  val storage = new TestStorage[(model.State, List[model.State])] {}
+  val storage = new InMemoryStore[(model.State, List[model.State])] {}
 
   override def fetch(implicit
-    hc: DummyContext,
+    hc: RequestContext,
     ec: ExecutionContext
   ): Future[Option[(model.State, List[model.State])]] = storage.fetch
 
   override def save(
     state: (model.State, List[model.State])
-  )(implicit hc: DummyContext, ec: ExecutionContext): Future[(model.State, List[model.State])] =
+  )(implicit hc: RequestContext, ec: ExecutionContext): Future[(model.State, List[model.State])] =
     storage.save(state)
 
   def set(state: model.State, breadcrumbs: List[model.State])(implicit
-    headerCarrier: DummyContext,
+    headerCarrier: RequestContext,
     timeout: Duration,
     ec: ExecutionContext
   ): Unit =
     Await.result(save((state, breadcrumbs)), timeout)
 
   def get(implicit
-    headerCarrier: DummyContext,
+    headerCarrier: RequestContext,
     timeout: Duration,
     ec: ExecutionContext
   ): Option[StateAndBreadcrumbs] =
     Await.result(fetch, timeout)
 
-  override def clear(implicit hc: DummyContext, ec: ExecutionContext): Future[Unit] =
+  override def clear(implicit hc: RequestContext, ec: ExecutionContext): Future[Unit] =
     Future.successful(storage.clear())
 
 }

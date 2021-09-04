@@ -41,13 +41,16 @@ trait JourneyModel {
   }
 
   /** Replace the current state with the new one. */
-  final def goto(state: State): Future[State] = Future.successful(state)
+  final def goto(state: State): Future[State] =
+    Future.successful(state)
 
   /** Fail the transition */
-  final def fail[T](exception: Exception): Future[T] = Future.failed(exception)
+  final def fail(exception: Exception): Future[State] =
+    Future.failed(exception)
 
   /** Stay in the current state */
-  final def stay[T]: Future[T] = Future.failed(StayInCurrentState)
+  final def stay: Future[Nothing] =
+    Future.failed(StayInCurrentState)
 
   /**
     * Transition from one state to the another.
@@ -78,7 +81,7 @@ trait JourneyModel {
       new Transition(rules)
   }
 
-  final case class TransitionNotAllowed(
+  case class TransitionNotAllowed(
     state: State,
     breadcrumbs: List[State],
     transition: Transition

@@ -41,7 +41,7 @@ class DummyJourneyController @Inject() (
   import DummyJourneyController._
   import journeyService.model.{Mergers, State, Transitions}
 
-  override implicit def context(implicit rh: RequestHeader): DummyContext = DummyContext()
+  override implicit def context(implicit rh: RequestHeader): DummyContext = DummyContext.default
 
   implicit val scheduler: Scheduler = actorSystem.scheduler
 

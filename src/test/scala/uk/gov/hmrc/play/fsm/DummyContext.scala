@@ -16,4 +16,8 @@
 
 package uk.gov.hmrc.play.fsm
 
-case class DummyContext()
+sealed trait DummyContext
+
+object DummyContext {
+  implicit val default: DummyContext = new DummyContext {}
+}

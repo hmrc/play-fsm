@@ -21,22 +21,26 @@ import java.util.function.UnaryOperator
 
 import scala.concurrent.{ExecutionContext, Future}
 
-trait TestStorage[S] {
+/**
+  * Basic in-memory store used to test journeys.
+  */
+trait InMemoryStore[Entity] {
 
-  private val state: AtomicReference[Option[S]] = new AtomicReference(None)
+  private val state: AtomicReference[Option[Entity]] = new AtomicReference(None)
 
-  def fetch(implicit hc: DummyContext, ec: ExecutionContext): Future[Option[S]] =
+  def fetch: Future[Option[Entity]] =
     Future.successful(state.get())
 
-  def save(newState: S)(implicit hc: DummyContext, ec: ExecutionContext): Future[S] =
+  def save(newState: Entity)(implicit ec: ExecutionContext): Future[Entity] =
     Future {
       state
-        .updateAndGet(new UnaryOperator[Option[S]] {
-          override def apply(t: Option[S]): Option[S] = Some(newState)
+        .updateAndGet(new UnaryOperator[Option[Entity]] {
+          override def apply(t: Option[Entity]): Option[Entity] = Some(newState)
         })
         .get
     }
 
   def clear(): Unit =
     state.set(None)
+
 }

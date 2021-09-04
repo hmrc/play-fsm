@@ -124,17 +124,21 @@ trait PersistentJourneyService[RequestContext] extends JourneyService[RequestCon
           case Some(sab) => sab
           case None      => (model.root, Nil)
         }
-        if (transition.apply.isDefinedAt(state)) transition.apply(state) flatMap { endState =>
-          save(
-            (
-              endState,
-              updateBreadcrumbs(endState, state, breadcrumbs)
-            )
+        transition.apply
+          .applyOrElse(
+            state,
+            // throw an exception to give outer layer a chance to stay in sync (e.g. redirect back to the current state)
+            (_: model.State) =>
+              model.fail(model.TransitionNotAllowed(state, breadcrumbs, transition))
           )
-        }
-        else
-          // throw an exception to give outer layer a chance to stay in sync (e.g. redirect back to the current state)
-          model.fail(model.TransitionNotAllowed(state, breadcrumbs, transition))
+          .flatMap { endState =>
+            save(
+              (
+                endState,
+                updateBreadcrumbs(endState, state, breadcrumbs)
+              )
+            )
+          }
       }
     } yield endStateOrError
 

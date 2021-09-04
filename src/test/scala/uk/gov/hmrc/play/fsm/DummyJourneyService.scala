@@ -18,7 +18,7 @@ package uk.gov.hmrc.play.fsm
 import javax.inject.Singleton
 
 @Singleton
-class DummyJourneyService extends TestJourneyService {
+class DummyJourneyService extends TestJourneyService[DummyContext] {
 
   override val model = DummyJourneyModel
 }
