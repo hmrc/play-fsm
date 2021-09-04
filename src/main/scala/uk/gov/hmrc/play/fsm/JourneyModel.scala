@@ -49,7 +49,7 @@ trait JourneyModel {
     Future.failed(exception)
 
   /** Stay in the current state */
-  final def stay: Future[Nothing] =
+  final def stay: Future[State] =
     Future.failed(StayInCurrentState)
 
   /**
