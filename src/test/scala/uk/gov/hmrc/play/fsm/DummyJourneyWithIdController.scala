@@ -42,7 +42,7 @@ class DummyJourneyWithIdController @Inject() (
   override def amendContext(rc: DummyContext)(key: String, value: String): DummyContext = rc
 
   override implicit def context(implicit rh: RequestHeader): DummyContext =
-    appendJourneyId(DummyContext())
+    appendJourneyId(DummyContext.default)
 
   val asUser: WithAuthorised[Int] = { implicit request => body =>
     body(5)

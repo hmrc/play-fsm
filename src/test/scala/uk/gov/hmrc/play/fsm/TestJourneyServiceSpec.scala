@@ -18,11 +18,9 @@ package uk.gov.hmrc.play.fsm
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class JourneyServiceSpec extends UnitSpec {
+class TestJourneyServiceSpec extends UnitSpec {
 
-  implicit val context = DummyContext()
-
-  val testService = new TestJourneyService {
+  val testService = new TestJourneyService[DummyContext] {
     override val model =
       new TestJourneyModel
 

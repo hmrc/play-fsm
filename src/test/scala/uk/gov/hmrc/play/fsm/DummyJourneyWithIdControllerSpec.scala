@@ -32,8 +32,6 @@ class DummyJourneyWithIdControllerSpec
     with StateAndBreadcrumbsMatchers
     with Eventually {
 
-  implicit val context: DummyContext = DummyContext()
-
   override lazy val app: Application = new GuiceApplicationBuilder().build()
 
   lazy val journeyState: DummyJourneyService = app.injector.instanceOf[DummyJourneyService]

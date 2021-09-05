@@ -27,7 +27,7 @@ lazy val library = Project(libName, file("."))
     scalaVersion := "2.12.12",
     libraryDependencies ++= PlayCrossCompilation.dependencies(
       shared = Seq(
-        "org.scalatest"       %% "scalatest"    % "3.2.3"             % Test,
+        "org.scalatest"       %% "scalatest"    % "3.2.8"             % Test,
         "com.vladsch.flexmark" % "flexmark-all" % "0.36.8"            % Test,
         "org.scalacheck"      %% "scalacheck"   % "1.14.3"            % Test,
         "com.typesafe.play"   %% "play-test"    % PlayVersion.current % Test

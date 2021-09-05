@@ -16,6 +16,8 @@
 
 package uk.gov.hmrc.play.fsm
 
+import org.scalatest.matchers.MatchResult
+import org.scalatest.matchers.Matcher
 import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.Await
@@ -23,44 +25,194 @@ import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration._
 import scala.reflect.ClassTag
-import scala.util.Try
+import org.scalactic.source
 
-trait JourneyModelSpec extends TestJourneyService with JourneyMatchers {
+/**
+  * Abstract base of FSM journey specifications.
+  *
+  * @example
+  *
+  *   given(State_A)
+  *     .when(transition)
+  *     .thenGoes(State_B)
+  *
+  *   given(State_A)
+  *     .when(transition)
+  *     .thenMatches {
+  *       case State_B(...) =>
+  *     }
+  *
+  *   given(State_A)
+  *     .when(transition)
+  *     .thenNoChange
+  *
+  *   given(State_A)
+  *     .when(transition)
+  *     .thenFailsWith[SomeExceptionType]
+  */
+trait JourneyModelSpec extends TestJourneyService[DummyContext] {
   self: Matchers =>
 
   val model: JourneyModel
 
-  case class given[S <: model.State: ClassTag](initialState: S) {
+  /** Assumption about the initial state of journey. */
+  case class given[S <: model.State: ClassTag](
+    initialState: S,
+    breadcrumbs: List[model.State] = Nil
+  ) {
 
     import scala.concurrent.ExecutionContext.Implicits.global
 
     private def await[A](future: Future[A])(implicit timeout: Duration): A =
       Await.result(future, timeout)
 
-    implicit val context: DummyContext          = DummyContext()
     implicit val defaultTimeout: FiniteDuration = 5 seconds
 
-    Option(initialState) match {
-      case Some(state) => await(save((state, Nil)))
-      case None        => await(clear)
+    final def withBreadcrumbs(breadcrumbs: model.State*): given[S] =
+      given(initialState, breadcrumbs.toList)
+
+    final def when(transition: model.Transition): When = {
+      Option(initialState) match {
+        case Some(state) => await(save((state, breadcrumbs)))
+        case None        => await(clear)
+      }
+      val resultOrException = await(
+        apply(transition)
+          .map(Right.apply)
+          .recover {
+            case model.TransitionNotAllowed(s, b, _) => Right((s, b))
+            case model.StayInCurrentState            => await(fetch).toRight(model.StayInCurrentState)
+            case exception                           => Left(exception)
+          }
+      )
+      When(initialState, resultOrException)
     }
 
-    def withBreadcrumbs(breadcrumbs: model.State*): this.type = {
-      await(for {
-        Some((s, _)) <- fetch
-        _            <- save((s, breadcrumbs.toList))
-      } yield ())
-      this
+    final def when(merger: model.Merger[S], state: model.State): When = {
+      Option(initialState) match {
+        case Some(state) => await(save((state, breadcrumbs)))
+        case None        => await(clear)
+      }
+      val resultOrException =
+        await(
+          modify { s: S => merger.apply((s, state)) }
+            .map(Right.apply)
+            .recover {
+              case model.TransitionNotAllowed(s, b, _) => Right((s, b))
+              case model.StayInCurrentState            => await(fetch).toRight(model.StayInCurrentState)
+              case exception                           => Left(exception)
+            }
+        )
+      When(initialState, resultOrException)
     }
-
-    def when(transition: model.Transition): (model.State, List[model.State]) =
-      await(apply(transition).recover { case model.TransitionNotAllowed(s, b, _) => (s, b) })
-
-    def shouldFailWhen(transition: model.Transition) =
-      Try(await(apply(transition))).isSuccess shouldBe false
-
-    def when(merger: model.Merger[S], state: model.State): (model.State, List[model.State]) =
-      await(modify { s: S => merger.apply((s, state)) })
   }
+
+  /** State transition result. */
+  case class When(
+    initialState: model.State,
+    result: Either[Throwable, (model.State, List[model.State])]
+  ) {
+
+    /** Asserts that the resulting state of the transition is equal to some expected state. */
+    final def thenGoes(state: model.State)(implicit pos: source.Position): Unit =
+      this should JourneyModelSpec.this.thenGo(state)
+
+    /** Asserts that the resulting state of the transition matches some case. */
+    final def thenMatches(
+      statePF: PartialFunction[model.State, Unit]
+    )(implicit pos: source.Position): Unit =
+      this should JourneyModelSpec.this.thenMatch(statePF)
+
+    /** Asserts that the transition hasn't change the state. */
+    final def thenNoChange(implicit pos: source.Position): Unit =
+      this should JourneyModelSpec.this.changeNothing
+
+    /** Asserts that the transition threw some expected exception of type E. */
+    final def thenFailsWith[E <: Throwable](implicit ct: ClassTag[E], pos: source.Position): Unit =
+      this should JourneyModelSpec.this.failWith[E]
+
+  }
+
+  /** Asserts that the resulting state of the transition is equal to some expected state. */
+  final def thenGo(state: model.State): Matcher[When] =
+    new Matcher[When] {
+      override def apply(result: When): MatchResult =
+        result match {
+          case When(_, Left(exception)) =>
+            MatchResult(false, s"Transition has been expected but got an exception $exception", s"")
+
+          case When(_, Right((thisState, _))) if state != thisState =>
+            if (state != result.initialState && thisState == result.initialState)
+              MatchResult(
+                false,
+                s"New state $state has been expected but the transition didn't happen.",
+                s""
+              )
+            else
+              MatchResult(false, s"State $state has been expected but got state $thisState", s"")
+
+          case _ =>
+            MatchResult(true, "", s"")
+        }
+    }
+
+  /** Asserts that the resulting state of the transition matches some case. */
+  final def thenMatch(
+    statePF: PartialFunction[model.State, Unit]
+  ): Matcher[When] =
+    new Matcher[When] {
+      override def apply(result: When): MatchResult =
+        result match {
+          case When(_, Left(exception)) =>
+            MatchResult(false, s"Transition has been expected but got an exception $exception", s"")
+
+          case When(_, Right((thisState, _))) if !statePF.isDefinedAt(thisState) =>
+            MatchResult(false, s"Matching state has been expected but got state $thisState", s"")
+
+          case _ => MatchResult(true, "", s"")
+        }
+    }
+
+  /** Asserts that the transition hasn't change the state. */
+  final val changeNothing: Matcher[When] =
+    new Matcher[When] {
+      override def apply(result: When): MatchResult =
+        result match {
+          case When(_, Left(exception)) =>
+            MatchResult(false, s"Transition has been expected but got an exception $exception", s"")
+
+          case When(initialState, Right((thisState, _))) if thisState != initialState =>
+            MatchResult(false, s"No state change has been expected but got state $thisState", s"")
+
+          case _ =>
+            MatchResult(true, "", s"")
+        }
+    }
+
+  /** Asserts that the transition threw some expected exception of type E. */
+  final def failWith[E <: Throwable](implicit ct: ClassTag[E]): Matcher[When] =
+    new Matcher[When] {
+      private val expectedClass = ct.runtimeClass
+      override def apply(result: When): MatchResult =
+        result match {
+          case When(_, Left(exception)) if !expectedClass.isAssignableFrom(exception.getClass) =>
+            MatchResult(
+              false,
+              s"Exception of type ${expectedClass
+                .getName()} has been expected but got exception of type ${exception.getClass().getName()}",
+              s""
+            )
+
+          case When(initialState, Right((thisState, _))) =>
+            MatchResult(
+              false,
+              s"Exception of type ${expectedClass.getName()} has been expected but got state $thisState",
+              s""
+            )
+
+          case _ =>
+            MatchResult(true, "", s"")
+        }
+    }
 
 }
