@@ -20,12 +20,22 @@ import scala.concurrent.Await
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
+import java.util.concurrent.atomic.AtomicInteger
 
 trait TestJourneyService[RequestContext] extends PersistentJourneyService[RequestContext] {
 
   override val journeyKey: String = "TestJourney"
 
+  private val counter: AtomicInteger = new AtomicInteger(0)
+
   val storage = new InMemoryStore[(model.State, List[model.State])] {}
+
+  override def apply(
+    transition: model.Transition
+  )(implicit rc: RequestContext, ec: ExecutionContext): Future[StateAndBreadcrumbs] = {
+    counter.incrementAndGet()
+    super.apply(transition)(rc, ec)
+  }
 
   override def fetch(implicit
     hc: RequestContext,
@@ -53,5 +63,7 @@ trait TestJourneyService[RequestContext] extends PersistentJourneyService[Reques
 
   override def clear(implicit hc: RequestContext, ec: ExecutionContext): Future[Unit] =
     Future.successful(storage.clear())
+
+  def getCounter(): Int = counter.get()
 
 }

@@ -16,7 +16,15 @@
 
 package uk.gov.hmrc.play.fsm
 
-class DummyJourneyModelSpec extends UnitSpec with JourneyModelSpec {
+import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.BeforeAndAfterAll
+
+class DummyJourneyModelSpec
+    extends AnyWordSpec
+    with Matchers
+    with BeforeAndAfterAll
+    with JourneyModelSpec {
 
   override val model = DummyJourneyModel
 
