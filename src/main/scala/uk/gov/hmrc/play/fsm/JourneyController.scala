@@ -187,6 +187,9 @@ trait JourneyController[RequestContext] {
       .map(getCallFor)
       .getOrElse(fallback.getOrElse(getCallFor(journeyService.model.root)))
 
+  /** Override to change the default behaviour of the [[actions.show[State]]]. */
+  lazy val defaultFallbackFromShow: Fallback = helpers.redirectToStartFallback
+
   /** FSM controller helper methods. */
   final object helpers {
 
@@ -371,9 +374,6 @@ trait JourneyController[RequestContext] {
         }
 
     final val redirectToCurrentStateFallback: Fallback = redirectToCurrentState(_, _, _)
-
-    /** Override to change the default behaviour of the [[actions.show[State]]]. */
-    val defaultShowFallback: Fallback = redirectToStartFallback
 
     //-------------------------------------------------
     // STATE RENDERING HELPERS
@@ -1314,8 +1314,11 @@ trait JourneyController[RequestContext] {
       }
 
       /**
-        * Display if the current state is of type S,
+        * Display current state if has type S,
         * otherwise redirect back to the root state.
+        *
+        * The default fallback behaviour can be altered per controller by
+        * overriding the [[defaultFallbackFromShow]] method.
         *
         * @tparam S type of the expected current state
         *
@@ -1334,7 +1337,7 @@ trait JourneyController[RequestContext] {
         new Show[S](
           rollback = false,
           merger = None,
-          fallback = JourneyController.this.helpers.defaultShowFallback
+          fallback = JourneyController.this.defaultFallbackFromShow
         ) with WithRollback[S] with WithApply[S] with WithRedirect[S]
 
       /** [[Show]] DSL data model. */

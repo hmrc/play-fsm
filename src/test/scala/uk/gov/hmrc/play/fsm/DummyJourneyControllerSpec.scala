@@ -211,6 +211,13 @@ class DummyJourneyControllerSpec
       journeyState.get should have[State](State.Start, Nil)
     }
 
+    "given Continue when showStart then redirect to root state" in {
+      journeyState.set(State.Continue("foo"), Nil)
+      val result = controller.showStart(fakeRequest)
+      status(result) shouldBe 303
+      journeyState.get should have[State](State.Start, Nil)
+    }
+
     "given Continue when oldShowStart then display most recent Start" in {
       journeyState.set(State.Continue("dummy"), List(State.Start))
       val result = controller.oldShowStart(fakeRequest)

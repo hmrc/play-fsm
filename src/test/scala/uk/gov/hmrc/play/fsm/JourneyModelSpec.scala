@@ -19,7 +19,6 @@ package uk.gov.hmrc.play.fsm
 import org.scalatest.matchers.MatchResult
 import org.scalatest.matchers.Matcher
 import org.scalatest.matchers.should.Matchers
-import uk.gov.hmrc.play.fsm.JourneyModel
 
 import scala.concurrent.Await
 import scala.concurrent.Future
@@ -148,20 +147,22 @@ trait JourneyModelSpec extends TestJourneyService[DummyContext] {
             if (state != result.initialState && thisState == result.initialState)
               MatchResult(
                 false,
-                s"New state ${AnsiColor.CYAN}${nameOf(state)}${AnsiColor.RESET} has been expected but the transition didn't happen.",
+                s"New state ${AnsiColor.CYAN}${PlayFsmUtils.identityOf(state)}${AnsiColor.RESET} has been expected but the transition didn't happen.",
                 s""
               )
             else if (state.getClass() == thisState.getClass()) {
               val diff = Diff(thisState, state)
               MatchResult(
                 false,
-                s"Obtained state ${AnsiColor.CYAN}${nameOf(state)}${AnsiColor.RESET} content differs from the expected:\n$diff}",
+                s"Obtained state ${AnsiColor.CYAN}${PlayFsmUtils
+                  .identityOf(state)}${AnsiColor.RESET} content differs from the expected:\n$diff}",
                 s""
               )
             } else
               MatchResult(
                 false,
-                s"State ${AnsiColor.CYAN}${nameOf(state)}${AnsiColor.RESET} has been expected but got state ${AnsiColor.CYAN}${nameOf(thisState)}${AnsiColor.RESET}",
+                s"State ${AnsiColor.CYAN}${PlayFsmUtils.identityOf(state)}${AnsiColor.RESET} has been expected but got state ${AnsiColor.CYAN}${PlayFsmUtils
+                  .identityOf(thisState)}${AnsiColor.RESET}",
                 s""
               )
 
@@ -242,17 +243,6 @@ trait JourneyModelSpec extends TestJourneyService[DummyContext] {
   // Delete the temp file
   override def afterAll() {
     info(s"Test suite executed ${getCounter()} state transitions in total.")
-  }
-
-  private def nameOf(state: model.State): String = {
-    val className = state.getClass.getName
-    val lastDot   = className.lastIndexOf('.')
-    val typeName = {
-      val s = if (lastDot < 0) className else className.substring(lastDot + 1)
-      if (s.last == '$') s.init else s
-    }
-    val lastDollar = typeName.lastIndexOf('$')
-    if (lastDollar < 0) typeName else typeName.substring(lastDollar + 1)
   }
 
 }
