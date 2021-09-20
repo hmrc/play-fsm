@@ -47,23 +47,13 @@ trait JsonStateFormats[State] {
   final val writes: Writes[State] = new Writes[State] {
     override def writes(state: State): JsValue =
       if (serializeStateProperties.isDefinedAt(state)) serializeStateProperties(state) match {
-        case JsNull     => Json.obj("state" -> nameOf(state))
-        case properties => Json.obj("state" -> nameOf(state), "properties" -> properties)
+        case JsNull => Json.obj("state" -> PlayFsmUtils.identityOf(state))
+        case properties =>
+          Json.obj("state" -> PlayFsmUtils.identityOf(state), "properties" -> properties)
       }
-      else Json.obj("state" -> nameOf(state))
+      else Json.obj("state" -> PlayFsmUtils.identityOf(state))
   }
 
   final def formats: Format[State] = Format(reads, writes)
-
-  final def nameOf(state: State): String = {
-    val className = state.getClass.getName
-    val lastDot   = className.lastIndexOf('.')
-    val typeName = {
-      val s = if (lastDot < 0) className else className.substring(lastDot + 1)
-      if (s.last == '$') s.init else s
-    }
-    val lastDollar = typeName.lastIndexOf('$')
-    if (lastDollar < 0) typeName else typeName.substring(lastDollar + 1)
-  }
 
 }

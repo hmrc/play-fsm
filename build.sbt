@@ -30,7 +30,8 @@ lazy val library = Project(libName, file("."))
         "org.scalatest"       %% "scalatest"    % "3.2.8"             % Test,
         "com.vladsch.flexmark" % "flexmark-all" % "0.36.8"            % Test,
         "org.scalacheck"      %% "scalacheck"   % "1.14.3"            % Test,
-        "com.typesafe.play"   %% "play-test"    % PlayVersion.current % Test
+        "com.typesafe.play"   %% "play-test"    % PlayVersion.current % Test,
+        "org.scalameta"       %% "munit"        % "0.7.29"            % Test
       ),
       play26 = Seq(
         "com.typesafe.play"      %% "play-json"          % "2.6.14",
