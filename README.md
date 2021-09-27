@@ -3,10 +3,32 @@
 play-fsm
 ===
 
-A pattern for stateful microservices using Scala and Play Framework
+A pattern for stateful microservices using Scala and Play Framework.
+
+Goal
 ===
 
-[See slides introducing play-fsm concept](https://docs.google.com/presentation/d/1VTfwz3zhzOtjr-Wg_Ol2wjcmHM0n8qQcvbqSaOwaO80)
+The `play-fsm` is primary a **pattern** to help implement service’s stateful business process logic in a clean, visible, consistent and enforceable way, easy to test, reason about and maintain later.
+
+On top of these `play-fsm` comes also as a **library** with a ready-to-use set of FSM abstractions and an advanced controller-building DSL, plus the complete service g8 template.
+
+On its own `play-fsm` does not mandate any particular UI design patterns, leaving the final wiring to the service developer, only providing a wide gamut of high-level semantic tools to do so in a coherent manner.
+
+There are a few main selling points of `play-fsm`:
+   - business logic code resembles closely the designer’s user flow diagram, making it easy to write, change and follow later,
+   - user’s state is a primary entity, explicitly transitioned and protected for integrity,
+   - super-easy and fast unit and integration testing of all possible business features, no matter how deeply hidden or tangled down the road,
+   - and bonus ... no new monads inside, only basic Scala skills required!
+
+Find out more
+---   
+
+[See slides introducing the play-fsm concept.](https://docs.google.com/presentation/d/1VTfwz3zhzOtjr-Wg_Ol2wjcmHM0n8qQcvbqSaOwaO80)
+
+[Play with our pizza tax service building workshop.](https://github.com/hmrc/pizza-tax-frontend-workshop)
+
+TL;DR
+===
 
 What `stateful` means?
 ---
@@ -76,8 +98,9 @@ Benefits of using `play-fsm`
 - Lightweight nature of journey model makes it perfect for extensive and fast unit testing,
 - Decoupled state management makes isolated integration tests both more straightforward and faster.
 
-API details
----
+API
+===
+
 The key concept is a **Journey**.
 Each journey represents separate business process/transaction.
 Each journey has a single root state.
@@ -112,7 +135,8 @@ Mixins
 - `JourneyIdSupport` mix into JourneyController to feature unique journeyId in the Play session
 
 Advanced examples:
----
+===
+
 - Agent Invitations: 
     - Models: <https://github.com/hmrc/agent-invitations-frontend/tree/master/app/uk/gov/hmrc/agentinvitationsfrontend/journeys>
     - Controllers: <https://github.com/hmrc/agent-invitations-frontend/blob/master/app/uk/gov/hmrc/agentinvitationsfrontend/controllers>
