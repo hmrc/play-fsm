@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 HM Revenue & Customs
+ * Copyright 2022 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,6 +47,24 @@ class OptionalFormOpsSpec extends UnitSpec {
     "return the second arg if first arg is None and request flash cookie is Empty" in {
       implicit val request: Request[AnyContent] = FakeRequest()
       None.or(form) shouldBe form
+    }
+
+    "ignore known unrelated flash keys" in {
+      implicit val request: Request[AnyContent] =
+        FakeRequest().withFlash("dummy" -> "", "switching-language" -> "true")
+      None.or(form).errors shouldBe form.bind(Map.empty[String, String]).errors
+    }
+
+    "bind ignoring known unrelated flash keys" in {
+      implicit val request: Request[AnyContent] =
+        FakeRequest().withFlash("switching-language" -> "true", "arg" -> "123")
+      None.or(form).value shouldBe form.bind(Map("arg" -> "123")).value
+    }
+
+    "fill default ignoring known unrelated flash keys" in {
+      implicit val request: Request[AnyContent] =
+        FakeRequest().withFlash("switching-language" -> "true")
+      None.or(form, Some(456)).value shouldBe form.bind(Map("arg" -> "456")).value
     }
   }
 }

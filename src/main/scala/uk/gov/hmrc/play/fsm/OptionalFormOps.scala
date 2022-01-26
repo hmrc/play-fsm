@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 HM Revenue & Customs
+ * Copyright 2022 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,26 +18,30 @@ package uk.gov.hmrc.play.fsm
 
 import play.api.data.Form
 import play.api.mvc.Request
+import play.api.mvc.Flash
 
 /** Extension methods for Option[Form[_]]. */
 object OptionalFormOps {
+
+  final val knownUnrelatedFlashKeys: Set[String] = Set("switching-language")
+
+  private def getFormData(flash: Flash, unrelatedFlashKeys: Set[String]): Map[String, String] =
+    flash.data.filterNot { case (key, _) => unrelatedFlashKeys.contains(key) }
+
   implicit class OptionalForm(val formWithErrors: Option[Form[_]]) extends AnyVal {
 
-    /** Returns formWithErrors or an empty form. */
-    def or[T](emptyForm: Form[T])(implicit request: Request[_]): Form[T] =
-      formWithErrors
-        .map(_.asInstanceOf[Form[T]])
-        .getOrElse {
-          if (request.flash.isEmpty) emptyForm else emptyForm.bind(request.flash.data)
-        }
-
     /** Returns formWithErrors or a pre-filled form, or an empty form. */
-    def or[T](emptyForm: Form[T], maybeFillWith: Option[T])(implicit request: Request[_]): Form[T] =
+    final def or[T](
+      emptyForm: Form[T],
+      maybeFillWith: Option[T] = None,
+      unrelatedFormKeys: Set[String] = knownUnrelatedFlashKeys
+    )(implicit request: Request[_]): Form[T] =
       formWithErrors
         .map(_.asInstanceOf[Form[T]])
         .getOrElse {
-          if (request.flash.isEmpty) maybeFillWith.map(emptyForm.fill).getOrElse(emptyForm)
-          else emptyForm.bind(request.flash.data)
+          val formData = getFormData(request.flash, unrelatedFormKeys)
+          if (formData.isEmpty) maybeFillWith.map(emptyForm.fill).getOrElse(emptyForm)
+          else emptyForm.bind(formData)
         }
   }
 }

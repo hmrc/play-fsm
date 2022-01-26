@@ -6,7 +6,7 @@ resolvers += Resolver.url(
   Resolver.ivyStylePatterns
 )
 
-addSbtPlugin("uk.gov.hmrc" % "sbt-auto-build" % "3.5.0")
+addSbtPlugin("uk.gov.hmrc" % "sbt-auto-build" % "3.6.0")
 
 addSbtPlugin("uk.gov.hmrc" % "sbt-distributables" % "2.1.0")
 
@@ -14,7 +14,7 @@ addSbtPlugin("org.scoverage" % "sbt-scoverage" % "1.6.0")
 
 addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.4.2")
 
-addSbtPlugin("uk.gov.hmrc" % "sbt-play-cross-compilation" % "2.2.0")
+addSbtPlugin("uk.gov.hmrc" % "sbt-play-cross-compilation" % "2.3.0")
 
 val playPlugin =
   if (sys.env.get("PLAY_VERSION").contains("2.6"))
