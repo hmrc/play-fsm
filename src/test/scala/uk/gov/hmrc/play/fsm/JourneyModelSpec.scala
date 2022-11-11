@@ -16,6 +16,8 @@
 
 package uk.gov.hmrc.play.fsm
 
+import scala.language.postfixOps
+
 import org.scalatest.matchers.MatchResult
 import org.scalatest.matchers.Matcher
 import org.scalatest.matchers.should.Matchers
