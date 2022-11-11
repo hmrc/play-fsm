@@ -6,7 +6,7 @@ resolvers += Resolver.url(
   Resolver.ivyStylePatterns
 )
 
-addSbtPlugin("uk.gov.hmrc" % "sbt-auto-build" % "3.6.0")
+addSbtPlugin("uk.gov.hmrc" % "sbt-auto-build" % "3.8.0")
 
 addSbtPlugin("uk.gov.hmrc" % "sbt-distributables" % "2.1.0")
 
@@ -22,6 +22,6 @@ val playPlugin =
   else if (sys.env.get("PLAY_VERSION").contains("2.7"))
     "com.typesafe.play" % "sbt-plugin" % "2.7.9"
   else
-    "com.typesafe.play" % "sbt-plugin" % "2.8.8"
+    "com.typesafe.play" % "sbt-plugin" % "2.8.18"
 
 addSbtPlugin(playPlugin)

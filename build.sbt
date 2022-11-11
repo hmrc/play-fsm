@@ -42,11 +42,11 @@ lazy val library = Project(libName, file("."))
         "org.scalatestplus.play" %% "scalatestplus-play" % "4.0.3" % Test
       ),
       play28 = Seq(
-        "com.typesafe.play"      %% "play-json"          % "2.8.1",
+        "com.typesafe.play"      %% "play-json"          % "2.8.2",
         "org.scalatestplus.play" %% "scalatestplus-play" % "5.1.0" % Test
       )
     ),
-    crossScalaVersions := List("2.12.12"),
+    crossScalaVersions := List("2.12.12", "2.13.10"),
     dependencyOverrides += "com.typesafe.play" %% "twirl-api" % "1.4.2",
     playCrossCompilationSettings,
     scalafmtOnCompile in Compile := true,
