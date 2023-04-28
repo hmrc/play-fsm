@@ -8,7 +8,7 @@ lazy val scoverageSettings = {
   Seq(
     // Semicolon-separated list of regex matching classes to exclude
     ScoverageKeys.coverageExcludedPackages := """uk\.gov\.hmrc\.BuildInfo;.*\.Routes;.*\.RoutesPrefix;.*Filters?;Module;GraphiteStartUp;.*\.Reverse[^.]*""",
-    ScoverageKeys.coverageMinimum := 80.00,
+    ScoverageKeys.coverageMinimumStmtTotal := 80.00,
     ScoverageKeys.coverageFailOnMinimum := false,
     ScoverageKeys.coverageHighlighting := true,
     parallelExecution in Test := false
@@ -24,7 +24,7 @@ lazy val library = Project(libName, file("."))
   )
   .settings(
     name := libName,
-    scalaVersion := "2.12.12",
+    scalaVersion := "2.13.10",
     libraryDependencies ++= PlayCrossCompilation.dependencies(
       shared = Seq(
         "org.scalatest"       %% "scalatest"    % "3.2.8"             % Test,
@@ -46,9 +46,21 @@ lazy val library = Project(libName, file("."))
         "org.scalatestplus.play" %% "scalatestplus-play" % "5.1.0" % Test
       )
     ),
+    //fix for scoverage compile errors for scala 2.13.10
+    libraryDependencySchemes ++= Seq("org.scala-lang.modules" %% "scala-xml" % VersionScheme.Always),
     crossScalaVersions := List("2.12.12", "2.13.10"),
     dependencyOverrides += "com.typesafe.play" %% "twirl-api" % "1.4.2",
     playCrossCompilationSettings,
+    scalacOptions ++= Seq(
+      "-Wdead-code",
+      "-Xlint",
+      "-Wconf:src=target/.*:s", // silence warnings from compiled files
+      "-Wconf:src=*html:w", // silence html warnings as they are wrong
+      "-Wconf:cat=deprecation:s",
+      "-Wconf:cat=unused-privates:s",
+      "-Wconf:cat=unused-nowarn:i",
+      "-Wconf:msg=match may not be exhaustive:is", // summarize warnings about non-exhaustive pattern matching
+    ),
     scalafmtOnCompile in Compile := true,
     scalafmtOnCompile in Test := true,
     scoverageSettings

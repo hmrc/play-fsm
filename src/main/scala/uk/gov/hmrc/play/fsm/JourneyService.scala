@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -83,7 +83,7 @@ trait PersistentJourneyService[RequestContext] extends JourneyService[RequestCon
     * Override to make the desired effect in your persistence layer of choice.
     * Put here to enable an interaction between controller and persistence layers.
     */
-  def clear(implicit rc: RequestContext, ec: ExecutionContext): Future[Unit] = Future.successful(())
+  def clear(): Future[Unit] = Future.successful(())
 
   /**
     * Default retention strategy is to keep all visited states.
