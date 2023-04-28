@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -61,7 +61,7 @@ trait TestJourneyService[RequestContext] extends PersistentJourneyService[Reques
   ): Option[StateAndBreadcrumbs] =
     Await.result(fetch, timeout)
 
-  override def clear(implicit hc: RequestContext, ec: ExecutionContext): Future[Unit] =
+  override def clear(): Future[Unit] =
     Future.successful(storage.clear())
 
   def getCounter(): Int = counter.get()
